@@ -1,0 +1,569 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 3,
+  "serialNumber": "urn:uuid:a3f7b2c1-4d5e-6f78-9a0b-1c2d3e4f5a6b",
+  "metadata": {
+    "timestamp": "2026-07-16T00:00:00Z",
+    "tools": [
+      {
+        "vendor": "Anthropic",
+        "name": "Claude Code",
+        "version": "claude-opus-4-8"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "msi-tese",
+      "name": "MSI-TESE — PQC/LWC vs Classical ICS/IIoT Testbed",
+      "version": "1.2.0",
+      "description": "Testbed de investigação académica que implementa arquitectura Defense-in-Depth ISA-95 em três ambientes segmentados por VLAN: Alpha (baseline em claro, sem criptografia), Bravo (pós-quântico/leve: Kyber768 + ML-DSA-65 + ASCON-128) e Charlie (clássico de controlo: ECDH-P384 + ECDSA-P384 + HKDF-SHA256 + AES-128-GCM). Alpha isola o custo de TER criptografia; Charlie isola o custo de ser PÓS-QUÂNTICO.",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/viper5000/MSI-TESE"
+        }
+      ]
+    }
+  },
+  "components": [
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-kyber768",
+      "name": "CRYSTALS-Kyber768",
+      "version": "NIST FIPS 203 (ML-KEM-768)",
+      "description": "Key Encapsulation Mechanism (KEM) pós-quântico baseado em reticulados Module-LWE. Usado no handshake entre ESP32 (Layer 0) e Servidor PQC (Layer 1) para estabelecer o segredo partilhado de 32 bytes que origina a chave ASCON-128. Implementado via liboqs (Open Quantum Safe). Executado no Raspberry Pi viper-keysb (aarch64) e invocado remotamente pelos ESP32 via HTTPS POST /kem/encapsulate (TLS 1.3 com certificado EC P-256, vide cert-tls-ec-p256).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kem",
+          "parameterSetIdentifier": "768",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"],
+          "classicalSecurityLevel": 180,
+          "nistQuantumSecurityLevel": 3
+        },
+        "oid": "2.16.840.1.101.3.4.4.2"
+      },
+      "externalReferences": [
+        { "type": "documentation", "url": "https://pq-crystals.org/kyber/" },
+        { "type": "documentation", "url": "https://doi.org/10.6028/NIST.FIPS.203" }
+      ]
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-dilithium3",
+      "name": "CRYSTALS-Dilithium3",
+      "version": "NIST FIPS 204 (ML-DSA-65)",
+      "description": "Esquema de assinatura digital pós-quântico baseado em reticulados Module-LWE/SIS. Usado no Servidor PQC para geração e verificação de assinaturas de mensagens industriais (endpoints /sig/sign e /sig/verify). Implementado via liboqs no Raspberry Pi viper-keysb (aarch64).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "parameterSetIdentifier": "3",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "sign", "verify"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 3
+        },
+        "oid": "2.16.840.1.101.3.4.3.18"
+      },
+      "externalReferences": [
+        { "type": "documentation", "url": "https://pq-crystals.org/dilithium/" },
+        { "type": "documentation", "url": "https://doi.org/10.6028/NIST.FIPS.204" }
+      ]
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-ascon128-esp32",
+      "name": "ASCON-128 (ESP32 — Firmware)",
+      "version": "NIST LWC / ISO/IEC 29192-7",
+      "description": "Cifra Autenticada com Dados Associados (AEAD) leve. Implementação custom em C++ (ascon_wrapper.h) nos ESP32. Wire format: Base64( nonce[16] | ciphertext | tag[16] ). Chave: 16 bytes (128 bits), derivada dos primeiros 16 bytes do segredo partilhado Kyber768. Executada em Xtensa LX6 dual-core (240 MHz). Tópicos cifrados: BRAVO/<MAC>/telemetria, BRAVO/<MAC>/metricas, BRAVO/<MAC>/estado.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "128",
+          "executionEnvironment": "firmware",
+          "implementationPlatform": "other",
+          "certificationLevel": ["none"],
+          "mode": "stream",
+          "cryptoFunctions": ["encrypt", "decrypt", "tag"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "externalReferences": [
+        { "type": "documentation", "url": "https://ascon.iaik.tugraz.at/" }
+      ]
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-ascon128-bridge",
+      "name": "ASCON-128 (Bridge / Gateway / PLC-Sim — Python)",
+      "version": "NIST LWC / ISO/IEC 29192-7",
+      "description": "Implementação Python do ASCON-128 (módulo ascon local) partilhada por três serviços Docker em viper-gateway-b (aarch64): (1) pqc-bridge — decifra payloads MQTT de BRAVO/#, grava telemetry_environment, telemetry_performance e telemetry_relay em InfluxDB, extrai node id do tópico MQTT (BRAVO/<MAC>/tipo) como fonte autoritativa; (2) pqc-gateway-translator — tradução LWC→PQC na camada edge, comunica com Servidor PQC via HTTPS; (3) plc-simulator — simulador IEC 61131-3 com verificação Dilithium3. Todos usam multi-key decryption com histórico de 5 sessões para tolerância a race conditions. Conexões ao Servidor PQC via HTTPS com verify=cert_path.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "128",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "mode": "stream",
+          "cryptoFunctions": ["decrypt"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "hw-tpm-slb9670",
+      "name": "Infineon SLB 9670 — TPM 2.0 (Let's Trust)",
+      "version": "TPM 2.0 rev 1.59",
+      "description": "Trusted Platform Module hardware no Raspberry Pi viper-keysb (192.168.20.200). Responsável por proteger as chaves privadas PQC (Kyber768 + Dilithium3) via operações seal/unseal com hierarquia de endorsement. Interface SPI. Gerido via tpm2-tools (tpm2_createprimary, tpm2_create, tpm2_load, tpm2_unseal) com TCTI device:/dev/tpmrm0. Utilizador pi membro do grupo tss para acesso sem root.",
+      "manufacturer": {
+        "name": "Infineon Technologies AG"
+      },
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "other",
+          "state": "active"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "cert-tls-ec-p256",
+      "name": "Certificado TLS — EC P-256 (ECDSA, Auto-assinado)",
+      "description": "Certificado X.509 auto-assinado de servidor para a API PQC (https://192.168.20.200:8000). Curva: prime256v1 (NIST P-256). Validade: 3650 dias. SANs: IP:192.168.20.200, DNS:viper-keysb. Gerado por generate_tls_cert.sh via openssl ecparam + openssl req -x509. Chave privada em tls/server.key; certificado em tls/server.crt. Copiado para ESP32 como pqc_server_cert.h (C++ raw string literal) e para o container Docker via volume /tls:ro. ESP32 usa WiFiClientSecure.setCACert(); Python usa requests(verify=cert_path). Sem cadeia PKI formal — certificado auto-assinado para ambiente de testbed.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "certificate",
+          "size": 256,
+          "state": "active",
+          "format": "X.509"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-kyber-server-pub",
+      "name": "Kyber768 — Chave Pública do Servidor PQC",
+      "description": "Chave pública KEM (1184 bytes / 9472 bits). Gerada no arranque do servidor se não existir. Distribuída a qualquer cliente via GET /server/public_keys. Persistida em disco (server_kyber.pub). Renovada em rotação forçada via POST /monitor/force_rotation.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key",
+          "size": 9472,
+          "algorithmRef": "alg-kyber768",
+          "state": "active",
+          "format": "raw"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-kyber-server-priv",
+      "name": "Kyber768 — Chave Privada do Servidor PQC (TPM-sealed)",
+      "description": "Chave privada KEM (2400 bytes / 19200 bits) selada no TPM hardware. Ficheiro server_kyber.priv.tpm contém os blobs TPM gerados por tpm2_create. Nunca exposta em plaintext persistente; apenas carregada em memória durante o contexto de decapsulamento.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key",
+          "size": 19200,
+          "algorithmRef": "alg-kyber768",
+          "state": "active",
+          "format": "other",
+          "securedBy": {
+            "mechanism": "tpm",
+            "algorithmRef": "hw-tpm-slb9670"
+          }
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-dilithium-server-pub",
+      "name": "Dilithium3 — Chave Pública do Servidor PQC",
+      "description": "Chave pública de assinatura (1952 bytes / 15616 bits). Persistida em disco (server_dilithium.pub). Distribuída via GET /server/public_keys.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key",
+          "size": 15616,
+          "algorithmRef": "alg-dilithium3",
+          "state": "active",
+          "format": "raw"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-dilithium-server-priv",
+      "name": "Dilithium3 — Chave Privada do Servidor PQC (TPM-sealed)",
+      "description": "Chave privada de assinatura (4000 bytes / 32000 bits) selada no TPM hardware. Ficheiro server_dilithium.priv.tpm.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key",
+          "size": 32000,
+          "algorithmRef": "alg-dilithium3",
+          "state": "active",
+          "format": "other",
+          "securedBy": {
+            "mechanism": "tpm",
+            "algorithmRef": "hw-tpm-slb9670"
+          }
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-kyber-shared-secret",
+      "name": "Kyber768 — Segredo Partilhado (Material de Sessão)",
+      "description": "Segredo de 32 bytes (256 bits) gerado por cada invocação de POST /kem/encapsulate. Os primeiros 16 bytes são truncados e usados diretamente como chave ASCON-128 (sem KDF explícita). Geração: ~1 por publicação por ESP32 (≈5 s). Janela histórica de 5 segredos mantida no servidor (session_key_history) para absorver a race condition entre handshake e publicação. Rotação horária forçada via NIST SP 800-57.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "shared-secret",
+          "size": 256,
+          "algorithmRef": "alg-kyber768",
+          "state": "active"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-ascon-session",
+      "name": "ASCON-128 — Chave de Sessão (derivada de Kyber768)",
+      "description": "Chave simétrica de 16 bytes (128 bits) obtida por truncagem dos primeiros 16 bytes do segredo partilhado Kyber768. Usada pelos ESP32 (encrypt) e pela Bridge (decrypt). Ephemeral: renovada a cada handshake KEM. Sem derivação por KDF — melhoria recomendada: aplicar HKDF-SHA256 ao segredo partilhado.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key",
+          "size": 128,
+          "algorithmRef": "alg-ascon128-esp32",
+          "state": "active"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "proto-mqtt-plaintext",
+      "name": "MQTT 3.1.1 (sem TLS)",
+      "description": "Transporte pub/sub entre ESP32 e Bridge via EMQX (viper-gateway-b:1883). Sem TLS na configuração actual do testbed — canal de transporte não cifrado. Payloads protegidos end-to-end por ASCON-128 (confidencialidade e autenticidade). Tópicos: BRAVO/<MAC_HEX>/telemetria | metricas | comando | estado. Subscrição da bridge: BRAVO/#. Node ID extraído autoritativamente do segmento MAC do tópico MQTT (BRAVO/<MAC>/tipo), não do payload JSON. Medições InfluxDB: telemetry_environment (temp/hum), telemetry_performance (métricas LWC), telemetry_relay (estado relé). Todas as medições com tags node e fw_version. Risco: metadata de tópico (MAC address) visível em plaintext no broker.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "other",
+          "version": "3.1.1"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "proto-https-pqc",
+      "name": "HTTPS/TLS 1.3 — API Servidor PQC",
+      "description": "Canal de handshake KEM entre ESP32 e Servidor PQC (https://192.168.20.200:8000). TLS com certificado EC P-256 auto-assinado (IP SAN: 192.168.20.200). ESP32 usa WiFiClientSecure com setCACert() para validar o servidor. Bridge usa requests com verify=cert_path. Certificado gerado por generate_tls_cert.sh (válido 10 anos). uvicorn com --ssl-keyfile/--ssl-certfile.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "1.3",
+          "cipherSuites": [
+            {
+              "algorithms": ["ECDHE-ECDSA-AES128-GCM-SHA256", "TLS_AES_128_GCM_SHA256"]
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "proto-wpa2",
+      "name": "WPA2-Personal (IEEE 802.11i)",
+      "description": "Segurança de camada de ligação WiFi nos ESP32. SSID: ViPeR5000-Bravo. Cifragem: AES-CCMP 128 bits. Autenticação: PSK via PBKDF2-HMAC-SHA1 (4096 iterações). Fornece confidencialidade e integridade no meio wireless, mas não substitui a cifragem end-to-end ASCON-128 nos payloads MQTT.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "wpa",
+          "version": "WPA2",
+          "cipherSuites": [
+            {
+              "algorithms": ["AES-CCMP-128"]
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-ecdh-p384",
+      "name": "ECDH secp384r1 (Charlie — Key Agreement)",
+      "description": "Acordo de chaves Diffie-Hellman de curva elíptica sobre a curva NIST P-384 (secp384r1). Substituto clássico do Kyber768 na fase Charlie. Cada nó de campo (ESP32) gera um par efémero e troca a chave pública com o servidor clássico (viper-pki-c, POST /kex/exchange); ambos derivam o mesmo segredo partilhado de 48 bytes — o segredo nunca viaja na rede (ao contrário do Kyber, cujo /kem/encapsulate devolve o shared secret). mbedTLS no ESP32; cryptography (Python) no servidor.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "curve": "secp384r1",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "keyderive"],
+          "classicalSecurityLevel": 192,
+          "nistQuantumSecurityLevel": 0
+        },
+        "oid": "1.2.840.10045.3.1.3"
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-ecdsa-p384",
+      "name": "ECDSA secp384r1 (Charlie — Signature, TPM-native)",
+      "description": "Esquema de assinatura de curva elíptica sobre P-384. Substituto clássico do ML-DSA-65. A chave privada ECDSA é gerada e usada DENTRO do TPM 2.0 (tpm2_create -G ecc384, handle persistente 0x81010020, tpm2_sign) — o escalar privado nunca sai do chip. Contrasta com o Bravo, cujas chaves PQC só podem ser seladas em blob (o TPM não tem tipo de chave pós-quântico). Achado da tese.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "curve": "secp384r1",
+          "executionEnvironment": "hardware",
+          "implementationPlatform": "other",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "sign", "verify"],
+          "classicalSecurityLevel": 192,
+          "nistQuantumSecurityLevel": 0
+        },
+        "oid": "1.2.840.10045.4.3.3"
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-hkdf-sha256",
+      "name": "HKDF-SHA256 (Charlie — Key Derivation)",
+      "description": "Função de derivação de chave HMAC-based (RFC 5869) aplicada ao segredo partilhado ECDH P-384 para derivar a chave AES-128-GCM de 16 bytes (info = \"charlie-aes-key\"). No ESP32 (core esp32 2.0.17) o mbedtls_hkdf não é linkável, pelo que ecdh_kex.h implementa HKDF manualmente via HMAC — validado byte-a-byte contra o servidor em 1000 amostras. Nota: o Bravo NÃO usa KDF (trunca os primeiros 16 bytes do segredo Kyber).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kdf",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keyderive"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg-aes128gcm",
+      "name": "AES-128-GCM (Charlie — Field AEAD)",
+      "description": "Cifra autenticada AES em modo Galois/Counter, cifra de campo da fase Charlie (substituto clássico do ASCON-128). Wire format: Base64( iv[12] | ciphertext | tag[16] ). Chave de 16 bytes derivada por HKDF-SHA256 do segredo ECDH. mbedTLS no ESP32 (aes_gcm_wrapper.h); cryptography AESGCM em Python. No Raspberry Pi beneficia das instruções AES do ARMv8; no ESP32-S3 (sem motor AES neste build) custa ~1.8x o ASCON por mensagem.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "128",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "aarch64",
+          "certificationLevel": ["none"],
+          "mode": "gcm",
+          "cryptoFunctions": ["encrypt", "decrypt", "tag"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        },
+        "oid": "2.16.840.1.101.3.4.1.6"
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-ecdsa-c-priv-tpm",
+      "name": "ECDSA P-384 — Chave Privada do Servidor Clássico (TPM-native)",
+      "description": "Escalar privado ECDSA P-384 gerado e residente dentro do Infineon SLB 9670 no viper-pki-c (192.168.30.200), handle persistente 0x81010020. Custódia nativa: a privada nunca existe fora do chip (ao contrário das PQC do Bravo, que são seladas em blob). Assinaturas via tpm2_sign; fallback de software se o /dev/tpmrm0 não estiver acessível (utilizador em grupo tss).",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key",
+          "size": 384,
+          "algorithmRef": "alg-ecdsa-p384",
+          "state": "active",
+          "format": "other",
+          "securedBy": {
+            "mechanism": "tpm",
+            "algorithmRef": "hw-tpm-slb9670"
+          }
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "key-aes-c-session",
+      "name": "AES-128-GCM — Chave de Sessão (Charlie, HKDF de ECDH)",
+      "description": "Chave simétrica de 16 bytes derivada por HKDF-SHA256 do segredo partilhado ECDH P-384. Usada pelos ESP32 Charlie (encrypt) e pela charlie-bridge (decrypt). Efémera: renovada a cada handshake ECDH (rotação horária, NIST SP 800-57). Distribuída à bridge via /monitor (active_session_key_b64), com janela histórica para self-healing.",
+      "cryptoProperties": {
+        "assetType": "relatedCryptoMaterial",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key",
+          "size": 128,
+          "algorithmRef": "alg-aes128gcm",
+          "state": "active"
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "proto-https-classical",
+      "name": "HTTPS/TLS 1.3 — API Servidor Clássico (Charlie)",
+      "description": "Canal do handshake ECDH entre ESP32 e servidor clássico (https://192.168.30.200:8000). TLS com certificado EC P-256 auto-assinado; o IP tem de constar como SAN de DNS além de IP (o mbedTLS do ESP32 só valida SANs DNS quando liga por IP). ESP32 negoceia TLS 1.2 (o core não tem 1.3); Python/Node negoceiam 1.3. Mesma abordagem TLS que o servidor PQC do Bravo (proto-https-pqc).",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "1.3",
+          "cipherSuites": [
+            {
+              "algorithms": ["ECDHE-ECDSA-AES128-GCM-SHA256", "TLS_AES_128_GCM_SHA256"]
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "phase-alpha-plaintext",
+      "name": "Fase Alpha — Baseline em Claro (sem criptografia)",
+      "description": "Ambiente de referência vulnerável (VLAN 100). Telemetria MQTT em JSON plaintext, sem AEAD de campo, sem servidor de chaves, sem TLS de aplicação. Serve para isolar o custo de TER criptografia (Alpha->Charlie) e de ser pós-quântico (Charlie->Bravo). Documentado aqui como asset criptográfico nulo para completude do inventário.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "other",
+          "version": "none"
+        }
+      }
+    }
+
+  ],
+
+  "dependencies": [
+    {
+      "ref": "key-ascon-session",
+      "dependsOn": ["key-kyber-shared-secret", "alg-kyber768"]
+    },
+    {
+      "ref": "key-kyber-shared-secret",
+      "dependsOn": ["alg-kyber768", "key-kyber-server-pub", "key-kyber-server-priv"]
+    },
+    {
+      "ref": "key-kyber-server-priv",
+      "dependsOn": ["hw-tpm-slb9670"]
+    },
+    {
+      "ref": "key-dilithium-server-priv",
+      "dependsOn": ["hw-tpm-slb9670"]
+    },
+    {
+      "ref": "alg-ascon128-esp32",
+      "dependsOn": ["key-ascon-session"]
+    },
+    {
+      "ref": "alg-ascon128-bridge",
+      "dependsOn": ["key-ascon-session"]
+    },
+    {
+      "ref": "proto-mqtt-plaintext",
+      "dependsOn": ["alg-ascon128-esp32", "alg-ascon128-bridge"]
+    },
+    {
+      "ref": "proto-https-pqc",
+      "dependsOn": ["alg-kyber768", "cert-tls-ec-p256"]
+    },
+    {
+      "ref": "cert-tls-ec-p256",
+      "dependsOn": ["proto-https-pqc"]
+    },
+    {
+      "ref": "alg-hkdf-sha256",
+      "dependsOn": ["alg-ecdh-p384"]
+    },
+    {
+      "ref": "key-aes-c-session",
+      "dependsOn": ["alg-hkdf-sha256", "alg-ecdh-p384"]
+    },
+    {
+      "ref": "key-ecdsa-c-priv-tpm",
+      "dependsOn": ["alg-ecdsa-p384", "hw-tpm-slb9670"]
+    },
+    {
+      "ref": "alg-aes128gcm",
+      "dependsOn": ["key-aes-c-session"]
+    },
+    {
+      "ref": "proto-https-classical",
+      "dependsOn": ["alg-ecdh-p384", "cert-tls-ec-p256"]
+    }
+  ],
+
+  "_notes": {
+    "gaps_identified": [
+      "Bravo: ausência de KDF explícita na derivação da chave ASCON-128 (trunca os primeiros 16 bytes do segredo Kyber768) — recomendado HKDF-SHA256. A fase Charlie já aplica HKDF-SHA256 ao segredo ECDH.",
+      "MQTT sem TLS: metadata de tópico (MAC) visível em plaintext no broker EMQX (todas as fases).",
+      "Ausência de autenticação mútua nos ESP32: os servidores de chaves não validam a identidade do cliente antes do handshake (apenas TLS unidireccional — servidor autenticado, cliente não).",
+      "Certificados TLS auto-assinados sem cadeia PKI formal — para produção emitir via CA interna ou ACME.",
+      "IDS Suricata em captura por SPAN — a monitorização por WiFi modo-estação vê apenas o próprio tráfego + broadcast; a cobertura unicast completa exige a porta espelhada com cabo."
+    ],
+    "resolved_since_v2": [
+      "Nonce ASCON-128 corrigido para 16 bytes e validado contra os vetores KAT oficiais em C/ESP32 e Python (bug no processamento do bloco final rate-aligned identificado e corrigido).",
+      "HKDF-SHA256 manual no ESP32 (Charlie) validado byte-a-byte contra o servidor.",
+      "TLS 1.3 activado em ambos os servidores de chaves (Bravo 20.200 e Charlie 30.200)."
+    ],
+    "key_rotation_policy": {
+      "trigger_periodic": "3600000 ms (1 hora, NIST SP 800-57)",
+      "trigger_on_demand": "POST /monitor/force_rotation",
+      "trigger_per_publish": "handshake KEM por cada publicação ESP32 (~5 s)",
+      "history_window": "5 sessões (server session_key_history)",
+      "bridge_retry": "multi-key decryption com histórico completo"
+    },
+    "implementations": {
+      "kyber768_dilithium3": "liboqs (Open Quantum Safe) — Python bindings via oqs module",
+      "ecdh_ecdsa_charlie": "ECDH/ECDSA secp384r1 — cryptography (Python) no servidor; mbedTLS no ESP32 (ecdh_kex.h). ECDSA assinado dentro do TPM via tpm2_sign (tpm_ecc.py, handle 0x81010020).",
+      "aes_gcm_charlie": "AES-128-GCM — mbedTLS (aes_gcm_wrapper.h) no ESP32; cryptography AESGCM em Python (bridge_charlie.py / epd_scada.py).",
+      "hkdf_charlie": "HKDF-SHA256 — manual via HMAC no ESP32 (ecdh_kex.h, o core 2.0.17 não linka mbedtls_hkdf); nativo no servidor.",
+      "ascon128_esp32": "Custom C++ (ascon_wrapper.h) — ESP32 Arduino core",
+      "ascon128_bridge": "Custom Python (ascon.py) — módulo local na imagem Docker (pqc-bridge, pqc-gateway-translator, plc-simulator)",
+      "tpm": "tpm2-tools CLI (tpm2_createprimary, tpm2_create, tpm2_load, tpm2_unseal)",
+      "tls_certificate": "EC P-256 auto-assinado gerado por generate_tls_cert.sh (openssl ecparam prime256v1 + openssl req -x509 -days 3650). Embedding no ESP32 via pqc_server_cert.h (C++ raw string). uvicorn iniciado com --ssl-keyfile tls/server.key --ssl-certfile tls/server.crt."
+    }
+  }
+}
