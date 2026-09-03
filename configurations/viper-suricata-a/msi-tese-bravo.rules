@@ -1,0 +1,187 @@
+# =============================================================================
+# MSI-TESE — Suricata detection rules (Bravo phase, VLAN 20)
+# Suricata >= 6.0 required (native MQTT parser + http.request_header)
+# Deploy: /etc/suricata/rules/msi-tese.rules
+# =============================================================================
+#
+# Alpha is the PLAINTEXT baseline: no ASCON, no PQC key server. Rules that
+# detect "plaintext MQTT payloads" (an ASCON bypass on Bravo) are intentionally
+# omitted here — plaintext is the expected, correct behaviour on Alpha.
+#
+# Network map:
+#   192.168.20.100  viper-gateway-b  (EMQX :1883, EMQX-dashboard :18083)
+#   192.168.20.60   viper-scada-b    (InfluxDB :8086, Grafana :3000, Node-RED :1880)
+#   192.168.20.50   viper-plc-b      (OpenPLC :8080, Modbus/TCP :502)
+#   192.168.20.11   ESP32 TempSensor
+#   192.168.20.12   ESP32 KineticNode
+#   192.168.20.13   ESP32 Relay
+#   192.168.20.250  viper-suricata-b (this node)
+#
+# SID ranges:
+#   1000xxx  MQTT
+#   1002xxx  ESP32 OTA / web interface
+#   1003xxx  InfluxDB
+#   1004xxx  EMQX dashboard
+#   1005xxx  Grafana
+#   1006xxx  Reconnaissance / scanning
+#   1007xxx  ARP / network integrity
+#   1008xxx  Modbus/TCP (OpenPLC viper-plc-b)
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# MQTT (port 1883, viper-gateway-b) — plaintext telemetry on Alpha
+# Authorized publishers: ESP32s (.11/.12/.13), SCADA (.60)
+# Only SCADA (.60) may publish to */comando topics
+# -----------------------------------------------------------------------------
+
+# Anonymous CONNECT (no username flag in connect flags byte)
+alert mqtt any any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT anonymous CONNECT — no credentials"; mqtt.connect.flags:!username; classtype:attempted-user; sid:2000001; rev:1;)
+
+# CONNECT from a host that is not an ESP32, SCADA or gateway
+alert tcp ![192.168.20.11,192.168.20.12,192.168.20.13,192.168.20.60,192.168.20.100] any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT CONNECT from unauthorized host"; flow:to_server,established; content:"|10|"; depth:1; threshold:type limit,track by_src,count 1,seconds 60; classtype:policy-violation; sid:2000002; rev:1;)
+
+# CONNECT brute force: > 10 CONNECT packets from same source in 60 s
+alert tcp any any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT CONNECT brute-force"; flow:to_server,established; content:"|10|"; depth:1; threshold:type threshold,track by_src,count 10,seconds 60; classtype:attempted-user; sid:2000003; rev:1;)
+
+# Relay command published by unauthorized host (only .60 may publish to */comando)
+alert mqtt ![192.168.20.60] any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT unauthorized relay command publish"; flow:to_server,established; mqtt.publish.topic; content:"comando"; classtype:policy-violation; sid:2000004; rev:1;)
+
+# Oversized packet on MQTT port (>1024 B is anomalous — possible injection)
+alert tcp any any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT oversized packet — possible injection"; flow:to_server,established; dsize:>1024; classtype:attempted-dos; sid:2000008; rev:1;)
+
+# Wildcard subscribe ('#') from unauthorized host — reconnaissance of all topics
+alert mqtt ![192.168.20.60,192.168.20.100] any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT wildcard subscribe from unauthorized host"; flow:to_server,established; mqtt.subscribe.topic; content:"#"; classtype:attempted-recon; sid:2000009; rev:1;)
+
+# PUBLISH flood: > 60 publishes/min from same source (DoS on broker)
+alert mqtt any any -> 192.168.20.100 1883 (msg:"MSI-TESE MQTT PUBLISH flood — possible DoS"; flow:to_server,established; mqtt.type:PUBLISH; threshold:type threshold,track by_src,count 60,seconds 60; classtype:attempted-dos; sid:2000010; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# ESP32 OTA / Web interface (port 80, nodes .11/.12/.13)
+# -----------------------------------------------------------------------------
+
+# POST to /ota — firmware upload attempt
+alert http any any -> [192.168.20.11,192.168.20.12,192.168.20.13] 80 (msg:"MSI-TESE ESP32 OTA firmware upload attempt"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/ota"; classtype:policy-violation; sid:2002001; rev:1;)
+
+# POST to /update — config change attempt
+alert http any any -> [192.168.20.11,192.168.20.12,192.168.20.13] 80 (msg:"MSI-TESE ESP32 config update attempt"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/update"; classtype:policy-violation; sid:2002002; rev:1;)
+
+# Rapid HTTP GET to ESP32 endpoints — web scraping / reconnaissance
+alert http any any -> [192.168.20.11,192.168.20.12,192.168.20.13] 80 (msg:"MSI-TESE ESP32 web interface reconnaissance"; flow:to_server,established; http.method; content:"GET"; threshold:type threshold,track by_src,count 10,seconds 30; classtype:attempted-recon; sid:2002003; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# InfluxDB (port 8086, viper-scada-b .60) — written by bravo-bridge (.60) and by
+# the IDS's own suricata-influx bridge (.250). Both are authorized writers, so
+# they are excluded to avoid self-detection / feedback loops.
+# -----------------------------------------------------------------------------
+
+# InfluxDB API access without Authorization header (exclude the sensor's own bridge)
+alert http !192.168.20.250 any -> 192.168.20.60 8086 (msg:"MSI-TESE InfluxDB unauthenticated API access"; flow:to_server,established; http.uri; content:"/api/v2/"; http.request_header; content:!"Authorization"; classtype:attempted-user; sid:2003001; rev:1;)
+
+# InfluxDB access from unauthorized host (only .60 and the IDS bridge .250 are authorized)
+alert http ![192.168.20.60,192.168.20.250] any -> 192.168.20.60 8086 (msg:"MSI-TESE InfluxDB access from unauthorized host"; flow:to_server,established; http.uri; content:"/api/v2/"; classtype:policy-violation; sid:2003002; rev:1;)
+
+# Destructive operation: DELETE bucket or measurement
+alert http any any -> 192.168.20.60 8086 (msg:"MSI-TESE InfluxDB DELETE operation — data destruction attempt"; flow:to_server,established; http.method; content:"DELETE"; classtype:policy-violation; sid:2003003; rev:1;)
+
+# Rapid query burst (> 50 queries/min): data exfiltration via bulk reads
+alert http any any -> 192.168.20.60 8086 (msg:"MSI-TESE InfluxDB rapid query burst — possible exfiltration"; flow:to_server,established; http.uri; content:"/api/v2/query"; threshold:type threshold,track by_src,count 50,seconds 60; classtype:policy-violation; sid:2003004; rev:1;)
+
+# Admin API access (/api/v2/setup, /api/v2/users, /api/v2/authorizations)
+alert http any any -> 192.168.20.60 8086 (msg:"MSI-TESE InfluxDB admin API access"; flow:to_server,established; http.uri; content:"/api/v2/"; pcre:"/\/api\/v2\/(setup|users|authorizations|orgs|buckets)/"; threshold:type limit,track by_src,count 1,seconds 60; classtype:policy-violation; sid:2003005; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# EMQX Management Dashboard (port 18083, viper-gateway-b)
+# -----------------------------------------------------------------------------
+
+# EMQX dashboard login brute force
+alert http any any -> 192.168.20.100 18083 (msg:"MSI-TESE EMQX dashboard login brute-force"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/api/v5/login"; threshold:type threshold,track by_src,count 5,seconds 60; classtype:attempted-user; sid:2004001; rev:1;)
+
+# EMQX management API from unauthorized host
+alert http ![192.168.20.60] any -> 192.168.20.100 18083 (msg:"MSI-TESE EMQX management API from unauthorized host"; flow:to_server,established; http.uri; content:"/api/v5/"; classtype:policy-violation; sid:2004002; rev:1;)
+
+# EMQX client kick / ban (disruptive management action)
+alert http any any -> 192.168.20.100 18083 (msg:"MSI-TESE EMQX client kick or ban operation"; flow:to_server,established; http.method; content:"DELETE"; http.uri; content:"/api/v5/clients/"; classtype:policy-violation; sid:2004003; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# Grafana (port 3000, viper-scada-b .60)
+# -----------------------------------------------------------------------------
+
+# Grafana admin login brute force
+alert http any any -> 192.168.20.60 3000 (msg:"MSI-TESE Grafana admin login brute-force"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; threshold:type threshold,track by_src,count 10,seconds 60; classtype:attempted-user; sid:2005001; rev:1;)
+
+# Grafana admin API access (datasource creation, org config, user management)
+alert http any any -> 192.168.20.60 3000 (msg:"MSI-TESE Grafana admin API access"; flow:to_server,established; http.uri; content:"/api/admin/"; classtype:policy-violation; sid:2005002; rev:1;)
+
+# Grafana datasource creation/modification (only admin should do this)
+alert http any any -> 192.168.20.60 3000 (msg:"MSI-TESE Grafana datasource modification"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/api/datasources"; classtype:policy-violation; sid:2005003; rev:1;)
+
+alert http any any -> 192.168.20.60 3000 (msg:"MSI-TESE Grafana datasource deletion"; flow:to_server,established; http.method; content:"DELETE"; http.uri; content:"/api/datasources/"; classtype:policy-violation; sid:2005004; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# Network reconnaissance / scanning
+# -----------------------------------------------------------------------------
+
+# TCP SYN sweep across ICS service ports from same source
+alert tcp any any -> 192.168.20.0/24 [1883,8086,18083,3000,1880,8080,502] (msg:"MSI-TESE ICS service port scan"; flow:to_server; flags:S; threshold:type threshold,track by_src,count 20,seconds 10; classtype:attempted-recon; sid:2006001; rev:1;)
+
+# Nmap User-Agent in HTTP requests
+alert http any any -> 192.168.20.0/24 any (msg:"MSI-TESE Nmap HTTP scan detected"; flow:to_server,established; http.user_agent; content:"Nmap"; nocase; classtype:attempted-recon; sid:2006002; rev:1;)
+
+# Masscan / ZMap signature (rapid SYN sweep)
+alert tcp any any -> 192.168.20.0/24 any (msg:"MSI-TESE Masscan/ZMap rapid SYN sweep"; flow:to_server; flags:S; threshold:type threshold,track by_src,count 100,seconds 5; classtype:attempted-recon; sid:2006003; rev:1;)
+
+# ICMP sweep (ping scan across subnet)
+alert icmp any any -> 192.168.20.0/24 any (msg:"MSI-TESE ICMP host discovery sweep"; itype:8; threshold:type threshold,track by_src,count 10,seconds 5; classtype:attempted-recon; sid:2006004; rev:1;)
+
+# SSH brute force on infrastructure nodes
+alert tcp any any -> [192.168.20.60,192.168.20.100,192.168.20.250] 22 (msg:"MSI-TESE SSH brute-force on infrastructure node"; flow:to_server,established; content:"SSH-"; threshold:type threshold,track by_src,count 5,seconds 60; classtype:attempted-user; sid:2006005; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# Modbus/TCP — OpenPLC on viper-plc-b (port 502)
+# Authorized masters: SCADA / Node-RED (.60)
+# -----------------------------------------------------------------------------
+
+# Modbus from unauthorized host (only SCADA .60 should send commands)
+alert tcp ![192.168.20.60] any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus access from unauthorized host"; flow:to_server,established; classtype:policy-violation; sid:2008001; rev:1;)
+
+# Modbus FC05 Write Single Coil — relay command
+alert tcp 192.168.20.60 any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus relay coil write"; flow:to_server,established; content:"|05 00 00|"; depth:10; offset:7; classtype:policy-violation; threshold:type limit,track by_src,count 1,seconds 5; sid:2008002; rev:1;)
+
+# Modbus FC06 Write Single Register — setpoint change
+alert tcp any any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus setpoint register write"; flow:to_server,established; content:"|06 00 00|"; depth:10; offset:7; threshold:type limit,track by_src,count 1,seconds 60; sid:2008003; rev:1;)
+
+# Modbus FC16 Write Multiple Registers — bulk write
+alert tcp any any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus bulk register write FC16"; flow:to_server,established; content:"|10|"; depth:1; offset:7; classtype:policy-violation; sid:2008004; rev:1;)
+
+# Modbus FC08 Diagnostics / FC43 device identification — reconnaissance
+alert tcp any any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus diagnostics/recon request"; flow:to_server,established; content:"|08|"; depth:1; offset:7; classtype:attempted-recon; sid:2008005; rev:1;)
+
+# Modbus request flood — > 60 requests/min from same source
+alert tcp any any -> 192.168.20.50 502 (msg:"MSI-TESE Modbus request flood"; flow:to_server,established; threshold:type threshold,track by_src,count 60,seconds 60; classtype:attempted-dos; sid:2008006; rev:1;)
+
+# OpenPLC web interface from unauthorized host
+alert http ![192.168.20.60] any -> 192.168.20.50 8080 (msg:"MSI-TESE OpenPLC web access from unauthorized host"; flow:to_server,established; http.uri; content:"/"; threshold:type limit,track by_src,count 1,seconds 300; classtype:policy-violation; sid:2008007; rev:1;)
+
+# OpenPLC PLC start/stop from any host (admin action)
+alert http any any -> 192.168.20.50 8080 (msg:"MSI-TESE OpenPLC start PLC action"; flow:to_server,established; http.uri; content:"/start_plc"; classtype:policy-violation; sid:2008008; rev:1;)
+
+alert http any any -> 192.168.20.50 8080 (msg:"MSI-TESE OpenPLC stop PLC action"; flow:to_server,established; http.uri; content:"/stop_plc"; classtype:policy-violation; sid:2008009; rev:1;)
+
+# OpenPLC program upload (firmware-like change)
+alert http any any -> 192.168.20.50 8080 (msg:"MSI-TESE OpenPLC program upload"; flow:to_server,established; http.uri; content:"/upload-program"; classtype:policy-violation; sid:2008010; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# ARP integrity (requires Suricata >= 6.0.4 with ARP parser)
+# In a lab: uncomment and set the correct MAC for each node after discovery.
+# -----------------------------------------------------------------------------
+
+# alert arp any any -> any any (msg:"MSI-TESE ARP spoofing — gateway IP claimed"; arp.opcode:2; arp.spa:192.168.20.100; sid:2007002; rev:1; classtype:bad-unknown;)
+# alert arp any any -> any any (msg:"MSI-TESE ARP spoofing — SCADA IP claimed"; arp.opcode:2; arp.spa:192.168.20.60; sid:2007003; rev:1; classtype:bad-unknown;)

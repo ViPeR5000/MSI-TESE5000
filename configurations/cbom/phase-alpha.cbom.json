@@ -1,0 +1,50 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:a1a00000-0000-4000-8000-000000000001",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-24T00:00:00Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "phase-alpha",
+      "name": "MSI-TESE Phase Alpha",
+      "description": "Vulnerable baseline. NO cryptographic protection: plaintext telemetry, commands, and storage end to end. This CBOM documents the absence of crypto assets and the resulting cleartext attack surface."
+    },
+    "properties": [
+      { "name": "msi:vlan", "value": "100 (192.168.100.0/24)" },
+      { "name": "msi:cryptographic-assets", "value": "none" },
+      { "name": "msi:cleartext-channels", "value": "MQTT/TCP telemetry; HTTP control; Modbus/TCP (no integrity); plaintext historian storage" }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:proto:mqtt-plaintext",
+      "name": "MQTT (plaintext)",
+      "description": "Field/edge telemetry transported over MQTT on TCP :1883 with no transport encryption — fully observable, the C2 exfiltration baseline.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "other",
+          "version": "3.1.1"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:proto:modbus-tcp",
+      "name": "Modbus/TCP (no integrity)",
+      "description": "PLC control traffic with no authentication or integrity — commands can be observed, injected, or modified.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "other"
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    { "ref": "phase-alpha", "dependsOn": ["crypto:proto:mqtt-plaintext", "crypto:proto:modbus-tcp"] }
+  ]
+}

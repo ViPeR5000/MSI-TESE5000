@@ -1,0 +1,21 @@
+[Unit]
+Description=MSI-TESE Suricata eve.json -> InfluxDB bridge
+After=network-online.target suricata.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# eve.json is root-owned; run as root (or add the service user to the suricata log group)
+User=root
+Environment=INFLUXDB_URL=http://192.168.20.60:8086
+Environment=INFLUXDB_ORG=msi-tese
+Environment=INFLUXDB_BUCKET=telemetry
+Environment=INFLUXDB_TOKEN=my-super-secret-auth-token-12345678
+Environment=SURICATA_EVE=/var/log/suricata/eve.json
+Environment=SURICATA_SENSOR=bravo
+ExecStart=/usr/bin/python3 /opt/suricata-influx/suricata_influx.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

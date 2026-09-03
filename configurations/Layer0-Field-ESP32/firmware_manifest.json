@@ -1,0 +1,119 @@
+{
+  "schema": "msi-tese-firmware-manifest/1.0",
+  "last_updated": "2026-06-12",
+  "versioning_policy": "SemVer: MAJOR.MINOR.PATCH-TYPE. MAJOR=quebra de protocolo, MINOR=nova feature, PATCH=bugfix.",
+
+  "firmwares": [
+    {
+      "id": "Secure-TempSensor",
+      "file": "Secure-TempSensor/Secure-TempSensor.ino",
+      "current_version": "1.1.0-TS-ASCON128",
+      "mqtt_topics": ["BRAVO/<MAC>/telemetria"],
+      "changelog": [
+        {
+          "version": "1.1.0-TS-ASCON128",
+          "date": "2026-06-12",
+          "changes": [
+            "OTA web (port 80, /ota, auth admin/msi-tese)",
+            "TLS no canal de handshake KEM (WiFiClientSecure + pqc_server_cert.h)",
+            "URL PQC server: http → https",
+            "fw_version + build_date publicados na telemetria MQTT",
+            "Banner de versão no Serial Monitor"
+          ]
+        },
+        {
+          "version": "1.0.0-TS-ASCON128",
+          "date": "2026-05-01",
+          "changes": [
+            "Versão inicial: DHT22, ASCON-128, Kyber768 handshake, MQTT telemetria"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Secure-KineticNode",
+      "file": "Secure-KineticNode/Secure-KineticNode.ino",
+      "current_version": "1.1.0-KN-ASCON128",
+      "mqtt_topics": ["BRAVO/<MAC>/telemetria", "BRAVO/<MAC>/metricas"],
+      "changelog": [
+        {
+          "version": "1.1.0-KN-ASCON128",
+          "date": "2026-06-12",
+          "changes": [
+            "OTA web em /ota (auth admin/msi-tese)",
+            "Firmware version badge no dashboard kinético",
+            "TLS no canal de handshake KEM (WiFiClientSecure + pqc_server_cert.h)",
+            "URL PQC server: http → https",
+            "fw_version + build_date em ambos os payloads (telemetria + métricas)"
+          ]
+        },
+        {
+          "version": "1.0.0-KN-ASCON128",
+          "date": "2026-05-01",
+          "changes": [
+            "Versão inicial: dados cinéticos simulados, métricas LWC, dashboard glassmorphic, mDNS, NTP"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Secure-Relay",
+      "file": "Secure-Relay/Secure-Relay.ino",
+      "current_version": "1.1.0-SR-ASCON128",
+      "mqtt_topics": ["BRAVO/<MAC>/comando (sub)", "BRAVO/<MAC>/estado (pub)"],
+      "changelog": [
+        {
+          "version": "1.1.0-SR-ASCON128",
+          "date": "2026-06-12",
+          "changes": [
+            "OTA web em /ota (auth admin/msi-tese)",
+            "Página de status com estado do relé (GPIO 5)",
+            "TLS no canal de handshake KEM (WiFiClientSecure + pqc_server_cert.h)",
+            "URL PQC server: http → https",
+            "fw_version + build_date no payload de estado MQTT"
+          ]
+        },
+        {
+          "version": "1.0.0-SR-ASCON128",
+          "date": "2026-05-01",
+          "changes": [
+            "Versão inicial: relay GPIO 5, ASCON-128 decrypt de comandos, feedback de estado"
+          ]
+        }
+      ]
+    }
+  ],
+
+  "common_config": {
+    "wifi_ssid": "ViPeR5000-Bravo",
+    "pqc_server": "https://192.168.20.200:8000",
+    "mqtt_broker": "192.168.20.100:1883",
+    "ota_credentials": { "user": "admin", "pass": "msi-tese" },
+    "crypto": {
+      "kem": "Kyber768",
+      "lwc": "ASCON-128",
+      "key_rotation_ms": 3600000
+    }
+  },
+
+  "influxdb_tags": {
+    "node": "MAC HEX do chip (ex: AABBCCDDEEFF)",
+    "fw_version": "Versão do firmware (ex: 1.1.0-TS-ASCON128)",
+    "note": "fw_version permite filtrar dados por versão em Grafana"
+  },
+
+  "version_bumping": {
+    "how_to_bump": [
+      "1. Editar FIRMWARE_VERSION em cada .ino (ex: 1.1.0 → 1.2.0)",
+      "2. Adicionar entrada no changelog deste ficheiro",
+      "3. Compilar e exportar .bin no Arduino IDE (Sketch → Export Compiled Binary)",
+      "4. Fazer upload via OTA: http://<ip-esp>/ota (admin/msi-tese)",
+      "5. Verificar nova versão no Serial Monitor e na página de status"
+    ],
+    "sem_ver_guide": {
+      "MAJOR": "Mudança de protocolo (ex: formato ASCON, tópico MQTT)",
+      "MINOR": "Nova feature compatível (ex: OTA, TLS, novo sensor)",
+      "PATCH": "Bugfix sem mudança de interface"
+    }
+  }
+}

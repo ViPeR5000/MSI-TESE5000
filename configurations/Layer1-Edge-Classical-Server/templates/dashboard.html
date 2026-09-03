@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classical Key Management Core & Monitor</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --panel-bg: rgba(13, 20, 35, 0.7);
+            --panel-border: rgba(255, 255, 255, 0.06);
+            --panel-border-hover: rgba(203, 213, 225, 0.25);
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            
+            --accent-cyan: #cbd5e1;
+            --accent-blue: #94a3b8;
+            --accent-purple: #64748b;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            
+            --glow-cyan: 0 0 20px rgba(203, 213, 225, 0.15);
+            --glow-purple: 0 0 20px rgba(100, 116, 139, 0.15);
+            --glow-emerald: 0 0 20px rgba(16, 114, 81, 0.2);
+            
+            --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--panel-border) transparent;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--panel-border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(15, 23, 42, 0.9) 0, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(148, 163, 184, 0.05) 0, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(100, 116, 139, 0.05) 0, transparent 50%);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            letter-spacing: -0.01em;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* SEO & Structural Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 1.5rem;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-container {
+            position: relative;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(203, 213, 225, 0.35);
+        }
+
+        .logo-shield {
+            color: #030712;
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .logo-pulse {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid var(--accent-cyan);
+            border-radius: 14px;
+            animation: pulse-border 2s infinite linear;
+            opacity: 0.5;
+        }
+
+        @keyframes pulse-border {
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.08); opacity: 0; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
+
+        .header-title-wrapper h1 {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(120deg, #ffffff 40%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title-wrapper p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.1rem;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-emerald);
+            box-shadow: var(--glow-emerald);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-emerald);
+            border-radius: 50%;
+            animation: blink 1.5s infinite ease-in-out;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* TPM Card Specific styles */
+        .card.tpm-card::before {
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+        }
+
+        .tpm-card .card-icon-container {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            color: var(--accent-emerald);
+            box-shadow: var(--glow-emerald);
+        }
+
+        /* Elegant Glassmorphic Card */
+        .card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--panel-border-hover);
+            box-shadow: 0 12px 30px rgba(203, 213, 225, 0.05);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, transparent);
+            transition: all 0.3s ease;
+        }
+
+        .card.kem-card::before {
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+        }
+
+        .card.sig-card::before {
+            background: linear-gradient(90deg, var(--accent-purple), #94a3b8);
+        }
+
+        .card.sessions-card::before {
+            background: linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan));
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .card-category {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            font-weight: 700;
+        }
+
+        .card-icon-container {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .kem-card .card-icon-container {
+            background: rgba(203, 213, 225, 0.08);
+            border: 1px solid rgba(203, 213, 225, 0.15);
+            color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .sig-card .card-icon-container {
+            background: rgba(100, 116, 139, 0.08);
+            border: 1px solid rgba(100, 116, 139, 0.15);
+            color: var(--accent-purple);
+            box-shadow: var(--glow-purple);
+        }
+
+        .sessions-card .card-icon-container {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            color: var(--accent-emerald);
+            box-shadow: var(--glow-emerald);
+        }
+
+        /* Metrics styling */
+        .metric-value-container {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .metric-value {
+            font-family: var(--font-display);
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .metric-unit {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .metric-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            padding-top: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .meta-label {
+            color: var(--text-secondary);
+        }
+
+        .meta-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        /* Split Workspace Area */
+        .workspace-area {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .workspace-area {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Control and Keys Panel */
+        .workspace-main {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .keys-section {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-icon {
+            color: var(--accent-cyan);
+        }
+
+        /* Key Copy Block */
+        .key-block {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .key-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        .key-name {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .key-algo-badge {
+            background: rgba(203, 213, 225, 0.08);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(203, 213, 225, 0.15);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .sig-block .key-algo-badge {
+            background: rgba(100, 116, 139, 0.08);
+            color: var(--accent-purple);
+            border: 1px solid rgba(100, 116, 139, 0.15);
+        }
+
+        .key-textarea-container {
+            position: relative;
+            display: flex;
+        }
+
+        .key-textarea {
+            width: 100%;
+            height: 60px;
+            background: transparent;
+            border: none;
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            resize: none;
+            outline: none;
+            padding-right: 2.5rem;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .sig-block .key-textarea {
+            color: var(--accent-purple);
+        }
+
+        .copy-btn {
+            position: absolute;
+            right: 0;
+            top: 0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            transform: scale(1.05);
+        }
+
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Control Deck Panel */
+        .control-deck {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .btn-action {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            color: #030712;
+            border: none;
+            border-radius: 12px;
+            padding: 1rem;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(203, 213, 225, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(203, 213, 225, 0.35);
+        }
+
+        .btn-action:active {
+            transform: translateY(1px);
+        }
+
+        /* Shiny Shimmer effect */
+        .btn-action::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -60%;
+            width: 20%;
+            height: 200%;
+            background: rgba(255, 255, 255, 0.25);
+            transform: rotate(30deg);
+            transition: none;
+            opacity: 0.13;
+        }
+
+        .btn-action:hover::after {
+            left: 120%;
+            transition: all 0.8s ease-in-out;
+        }
+
+        .btn-icon {
+            font-size: 1.15rem;
+            display: inline-block;
+            transition: transform 0.5s ease;
+        }
+
+        .btn-action:hover .btn-icon {
+            transform: rotate(180deg);
+        }
+
+        .btn-action:disabled {
+            background: var(--panel-border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .btn-action:disabled .btn-icon {
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Console Terminal Side Area */
+        .terminal-panel {
+            background: #090e1a;
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            max-height: 520px;
+            min-height: 400px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--panel-border);
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+        }
+
+        .terminal-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .terminal-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-rose);
+        }
+
+        .terminal-header-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .control-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--panel-border);
+        }
+
+        .control-circle.red { background-color: var(--accent-rose); }
+        .control-circle.yellow { background-color: var(--accent-amber); }
+        .control-circle.green { background-color: var(--accent-emerald); }
+
+        .terminal-body {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            line-height: 1.5;
+        }
+
+        .log-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            animation: fade-in 0.3s ease;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .log-tag {
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .tag-info { background: rgba(148, 163, 184, 0.12); color: var(--accent-blue); border: 1px solid rgba(148, 163, 184, 0.2); }
+        .tag-success { background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .tag-warning { background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+        .tag-handshake { background: rgba(203, 213, 225, 0.12); color: var(--accent-cyan); border: 1px solid rgba(203, 213, 225, 0.2); }
+
+        .log-msg {
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .log-msg-highlight {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Toast notifications styling */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: rgba(13, 20, 35, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), var(--glow-cyan);
+            min-width: 320px;
+            transform: translateX(120%);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+            color: var(--accent-cyan);
+        }
+
+        .toast-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .toast-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .toast-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        footer {
+            border-top: 1px solid var(--panel-border);
+            padding: 1.5rem 0;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: auto;
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        footer a:hover {
+            color: var(--accent-blue);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Header Section -->
+        <header>
+            <div class="header-brand">
+                <div class="logo-container">
+                    <span class="logo-shield">Ω</span>
+                    <div class="logo-pulse"></div>
+                </div>
+                <div class="header-title-wrapper">
+                    <h1>Classical Key Management Core</h1>
+                    <p> realistic IIoT-Driven ICS Testbed • Gestor de Monitorização e Chaves Quânticas </p>
+                </div>
+            </div>
+            
+            <div class="system-status" id="system-status-badge">
+                <div class="status-dot"></div>
+                <span id="status-text">Core Operational</span>
+            </div>
+        </header>
+
+        <!-- Metrics Dashboard Grid -->
+        <section class="dashboard-grid" aria-label="Métricas Principais">
+            
+            <!-- KEX ECDH Card -->
+            <div class="card kem-card">
+                <div class="card-header">
+                    <div class="card-title-area">
+                        <span class="card-category">Key Agreement (KEX)</span>
+                        <h2 class="card-title" id="kem-algorithm-name">ECDH-secp384r1</h2>
+                    </div>
+                    <div class="card-icon-container">🔑</div>
+                </div>
+                <div class="metric-value-container">
+                    <span class="metric-value" id="kem-bits">384</span>
+                    <span class="metric-unit">Classical EC Bits</span>
+                </div>
+                <div class="metric-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Última Rotação</span>
+                        <span class="meta-value" id="last-rotation-time">A calcular...</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Idade da Chave</span>
+                        <span class="meta-value" id="key-age">00m 00s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signature Card -->
+            <div class="card sig-card">
+                <div class="card-header">
+                    <div class="card-title-area">
+                        <span class="card-category">Digital Signature (SIG)</span>
+                        <h2 class="card-title" id="sig-algorithm-name">ECDSA-secp384r1</h2>
+                    </div>
+                    <div class="card-icon-container">✒️</div>
+                </div>
+                <div class="metric-value-container">
+                    <span class="metric-value" id="sig-level">3</span>
+                    <span class="metric-unit">Segurança NIST</span>
+                </div>
+                <div class="metric-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Integridade</span>
+                        <span class="meta-value" style="color: var(--accent-purple);">Assinatura Ativa</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Uso Principal</span>
+                        <span class="meta-value" style="font-family: var(--font-body);">Comandos SCADA/PLC</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sessions Card -->
+            <div class="card sessions-card">
+                <div class="card-header">
+                    <div class="card-title-area">
+                        <span class="card-category">Segurança IoT (EMQX + ESP32)</span>
+                        <h2 class="card-title">Handshakes ECDH</h2>
+                    </div>
+                    <div class="card-icon-container">🛰️</div>
+                </div>
+                <div class="metric-value-container">
+                    <span class="metric-value" id="handshake-counter-value">0</span>
+                    <span class="metric-unit">Sessões Ativas</span>
+                </div>
+                <div class="metric-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Criptografia de Canal</span>
+                        <span class="meta-value" style="color: var(--accent-emerald);">AES-128-GCM</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Uptime do Servidor</span>
+                        <span class="meta-value" id="server-uptime">00:00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TPM Hardware Security Card -->
+            <div class="card tpm-card">
+                <div class="card-header">
+                    <div class="card-title-area">
+                        <span class="card-category">Hardware Security (HSM)</span>
+                        <h2 class="card-title">Let's Trust TPM</h2>
+                    </div>
+                    <div class="card-icon-container" id="tpm-icon">🛡️</div>
+                </div>
+                <div class="metric-value-container">
+                    <span class="metric-value" id="tpm-state" style="font-size: 1.8rem; font-weight: 800;">A calcular...</span>
+                    <span class="metric-unit" id="tpm-unit"></span>
+                </div>
+                <div class="metric-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Dispositivo</span>
+                        <span class="meta-value" id="tpm-device-path">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Proteção</span>
+                        <span class="meta-value" id="tpm-info-text" style="font-family: var(--font-body); font-size: 0.73rem; color: var(--text-secondary);">--</span>
+                    </div>
+                </div>
+            </div>
+            
+        </section>
+
+        <!-- Main Workspace (Keys & Logging) -->
+        <section class="workspace-area">
+            
+            <!-- Left Pane: Keys & Control -->
+            <div class="workspace-main">
+                
+                <!-- Action / Control -->
+                <div class="control-deck">
+                    <h3 class="section-title">
+                        <span class="section-icon">⚙️</span>
+                        Ações de Gestão de Chaves
+                    </h3>
+                    <div class="control-grid">
+                        <button class="btn-action" id="force-rotation-btn" onclick="triggerForcedRotation()">
+                            <span class="btn-icon">🔄</span>
+                            <span id="btn-text">Forçar Rotação de Chave KEM</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Keys Display -->
+                <div class="keys-section">
+                    <div class="section-header">
+                        <h3 class="section-title">
+                            <span class="section-icon">🔐</span>
+                            Chaves Públicas Ativas no Servidor
+                        </h3>
+                    </div>
+
+                    <!-- Active Session Key -->
+                    <div class="key-block kem-block">
+                        <div class="key-block-header">
+                            <span class="key-name">Chave de Sessão Ativa (AES-128)</span>
+                            <span class="key-algo-badge" id="kem-badge">ECDH-secp384r1</span>
+                        </div>
+                        <div class="key-textarea-container">
+                            <textarea class="key-textarea" id="kem-key-pub" readonly>A carregar chave pública...</textarea>
+                            <button class="copy-btn" onclick="copyToClipboard('kem-key-pub')" title="Copiar Chave de Sessão Ativa (AES-128)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ECDSA Public Key -->
+                    <div class="key-block sig-block">
+                        <div class="key-block-header">
+                            <span class="key-name">Chave Pública SIG</span>
+                            <span class="key-algo-badge" id="sig-badge">ECDSA-secp384r1</span>
+                        </div>
+                        <div class="key-textarea-container">
+                            <textarea class="key-textarea" id="sig-key-pub" readonly>A carregar chave pública...</textarea>
+                            <button class="copy-btn" onclick="copyToClipboard('sig-key-pub')" title="Copiar Chave Pública SIG">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Pane: Terminal Log Stream -->
+            <div class="terminal-panel">
+                <div class="terminal-header">
+                    <div class="terminal-title">
+                        <div class="terminal-dot"></div>
+                        LOGS DO SISTEMA LIVE
+                    </div>
+                    <div class="terminal-header-controls">
+                        <div class="control-circle red"></div>
+                        <div class="control-circle yellow"></div>
+                        <div class="control-circle green"></div>
+                    </div>
+                </div>
+                <div class="terminal-body" id="log-console">
+                    <!-- Logs will be loaded dynamically -->
+                    <div class="log-row">
+                        <span class="log-time">[--:--:--]</span>
+                        <span class="log-tag tag-info">INFO</span>
+                        <span class="log-msg">A iniciar ligação ao stream de monitorização...</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>Desenvolvido para MSI TESE © 2026. ECDH-secp384r1 & ECDSA-secp384r1 Integrados em Redes de Automação Industrial Seguras.</p>
+        </footer>
+
+    </div>
+
+    <!-- Toast Notifications Center -->
+    <div class="toast-container" id="toast-center"></div>
+
+    <script>
+        // Global variables
+        let lastRotationTime = null;
+        let lastHandshakeCount = 0;
+        let logsCache = [];
+
+        // Formatting date
+        function formatTime(isoString) {
+            if (!isoString) return '--:--:--';
+            const date = new Date(isoString);
+            return date.toTimeString().split(' ')[0];
+        }
+
+        // Add toast dynamically
+        function showToast(title, desc, icon = '🔄') {
+            const container = document.getElementById('toast-center');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-desc">${desc}</div>
+                </div>
+            `;
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Null-safe DOM helpers
+        function setEl(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+        function setVal(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.value = value;
+        }
+        function setStyle(id, prop, value) {
+            const el = document.getElementById(id);
+            if (el) el.style[prop] = value;
+        }
+
+        // Fetch updates periodically
+        async function fetchMonitorData() {
+            try {
+                const response = await fetch('/monitor');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+
+                // Update UI elements
+                setEl('kem-algorithm-name', data.kex_algorithm || 'ECDH-secp384r1');
+                setEl('sig-algorithm-name', data.sig_algorithm || 'ECDSA-secp384r1');
+                setEl('kem-badge', data.kex_algorithm || 'ECDH-secp384r1');
+                setEl('sig-badge', data.sig_algorithm || 'ECDSA-secp384r1');
+
+                // Set public key values
+                if (data.active_session_key_b64) setVal('kem-key-pub', data.active_session_key_b64);
+                if (data.sig_public_key_b64) setVal('sig-key-pub', data.sig_public_key_b64);
+
+                // Update handshake counter
+                const count = data.handshake_counter || 0;
+                setEl('handshake-counter-value', count);
+                if (count > lastHandshakeCount && lastHandshakeCount !== 0) {
+                    setStyle('handshake-counter-value', 'color', 'var(--accent-cyan)');
+                    setTimeout(() => setStyle('handshake-counter-value', 'color', ''), 500);
+                    showToast('Novo Handshake Clássico', 'Módulo ESP32 estabeleceu chave com sucesso!', '🛰️');
+                }
+                lastHandshakeCount = count;
+
+                // Rotation & uptime
+                if (data.last_key_rotation) {
+                    lastRotationTime = new Date(data.last_key_rotation);
+                    setEl('last-rotation-time', formatTime(data.last_key_rotation));
+                }
+                if (data.server_uptime_str) setEl('server-uptime', data.server_uptime_str);
+
+                // TPM dynamic updates
+                if (data.tpm_backed) {
+                    setEl('tpm-state', 'ATIVO');
+                    setStyle('tpm-state', 'color', 'var(--accent-emerald)');
+                    setEl('tpm-unit', 'Hardware');
+                    setStyle('tpm-unit', 'color', 'var(--accent-emerald)');
+                    setEl('tpm-device-path', data.tpm_device || '/dev/tpmrm0');
+                    setEl('tpm-info-text', data.tpm_status || 'Infineon OPTIGA™ SLB 9670');
+                    setEl('tpm-icon', '🛡️');
+                    setStyle('tpm-icon', 'color', 'var(--accent-emerald)');
+                    setStyle('tpm-icon', 'borderColor', 'rgba(16, 185, 129, 0.15)');
+                    setStyle('tpm-icon', 'background', 'rgba(16, 185, 129, 0.08)');
+                    setStyle('tpm-icon', 'boxShadow', 'var(--glow-emerald)');
+                } else {
+                    setEl('tpm-state', 'SIMULADO');
+                    setStyle('tpm-state', 'color', 'var(--accent-amber)');
+                    setEl('tpm-unit', 'Fallback');
+                    setStyle('tpm-unit', 'color', 'var(--accent-amber)');
+                    setEl('tpm-device-path', 'None (Simulação)');
+                    setEl('tpm-info-text', 'Persistência segura por Software');
+                    setEl('tpm-icon', '⚠️');
+                    setStyle('tpm-icon', 'color', 'var(--accent-amber)');
+                    setStyle('tpm-icon', 'borderColor', 'rgba(245, 158, 11, 0.15)');
+                    setStyle('tpm-icon', 'background', 'rgba(245, 158, 11, 0.08)');
+                    setStyle('tpm-icon', 'boxShadow', '0 0 15px rgba(245, 158, 11, 0.15)');
+                }
+
+                // Log render
+                if (data.logs && Array.isArray(data.logs)) renderLogs(data.logs);
+
+                // Restore active status
+                const badge = document.getElementById('system-status-badge');
+                if (badge) badge.className = 'system-status';
+                setEl('status-text', 'Core Operational');
+                setStyle('status-text', 'color', '');
+
+            } catch (err) {
+                console.error('[MSI Dashboard]', err);
+                const badge = document.getElementById('system-status-badge');
+                if (badge) {
+                    badge.className = 'system-status';
+                    badge.style.background = 'rgba(244, 63, 94, 0.08)';
+                    badge.style.borderColor = 'rgba(244, 63, 94, 0.2)';
+                    badge.style.boxShadow = '0 0 15px rgba(244, 63, 94, 0.15)';
+                }
+                setEl('status-text', `Offline — ${err.message}`);
+                setStyle('status-text', 'color', 'var(--accent-rose)');
+            }
+        }
+
+        // Render Logs inside console
+        function renderLogs(logs) {
+            const consoleEl = document.getElementById('log-console');
+            
+            // Check if there are differences
+            if (JSON.stringify(logs) === JSON.stringify(logsCache)) return;
+            logsCache = logs;
+
+            consoleEl.innerHTML = '';
+            logs.forEach(log => {
+                const row = document.createElement('div');
+                row.className = 'log-row';
+                
+                let tagClass = 'tag-info';
+                if (log.type === 'warning') tagClass = 'tag-warning';
+                else if (log.type === 'success') tagClass = 'tag-success';
+                else if (log.type === 'handshake') tagClass = 'tag-handshake';
+
+                row.innerHTML = `
+                    <span class="log-time">[${formatTime(log.timestamp)}]</span>
+                    <span class="log-tag ${tagClass}">${log.type}</span>
+                    <span class="log-msg">${log.event}</span>
+                `;
+                consoleEl.appendChild(row);
+            });
+
+            // Scroll to bottom
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // Trigger Forced Key Rotation
+        async function triggerForcedRotation() {
+            const btn = document.getElementById('force-rotation-btn');
+            const btnText = document.getElementById('btn-text');
+            const prevHtml = btn.innerHTML;
+
+            try {
+                // Disable and load
+                btn.disabled = true;
+                btnText.textContent = 'A gerar novas chaves ECDH-secp384r1...';
+                
+                const response = await fetch('/monitor/force_rotation', { method: 'POST' });
+                if (!response.ok) throw new Error('Não foi possível forçar rotação de chaves');
+                
+                const data = await response.json();
+                
+                // Show success
+                showToast('Rotação Concluída', 'Novas chaves clássicas ECDH-secp384r1 foram geradas e expostas.', '🔄');
+                
+                // Immediate refresh
+                await fetchMonitorData();
+
+            } catch (err) {
+                console.error(err);
+                showToast('Erro na Rotação', 'Falha ao rodar chaves do servidor.', '❌');
+            } finally {
+                // Enable button
+                btn.disabled = false;
+                btn.innerHTML = prevHtml;
+            }
+        }
+
+        // Copy key values
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).value;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copiado!', 'Chave pública copiada para a área de transferência.', '📋');
+            }).catch(err => {
+                showToast('Erro', 'Não foi possível copiar.', '❌');
+            });
+        }
+
+        // Update Key Age Live
+        function updateKeyAge() {
+            if (!lastRotationTime) return;
+            const now = new Date();
+            const diffMs = now - lastRotationTime;
+            
+            const diffHrs = Math.floor(diffMs / 3600000);
+            const diffMins = Math.floor((diffMs % 3600000) / 60000);
+            const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+            const pad = (n) => String(n).padStart(2, '0');
+            
+            let ageStr = '';
+            if (diffHrs > 0) {
+                ageStr = `${pad(diffHrs)}h ${pad(diffMins)}m ${pad(diffSecs)}s`;
+            } else {
+                ageStr = `${pad(diffMins)}m ${pad(diffSecs)}s`;
+            }
+
+            document.getElementById('key-age').textContent = ageStr;
+        }
+
+        // Init and timers
+        fetchMonitorData();
+        setInterval(fetchMonitorData, 2000); // Polling every 2s
+        setInterval(updateKeyAge, 1000);    // Live age ticking every 1s
+    </script>
+</body>
+</html>

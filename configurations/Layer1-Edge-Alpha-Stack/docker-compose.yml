@@ -1,0 +1,52 @@
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: alpha-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword123
+      - DOCKER_INFLUXDB_INIT_ORG=msi-tese
+      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token-12345678
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: alpha-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=adminpassword123
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - influxdb
+
+  # Ingestão MQTT→InfluxDB: feita pelo bridge Python `alpha-bridge` (serviço
+  # systemd em scada-a, ver bridge/bridge_alpha.py), não por Telegraf — mantém
+  # a paridade com o Bravo/Charlie (mesmo modelo de bridge em todas as fases).
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: alpha-nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=Europe/Lisbon
+    volumes:
+      - nodered_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  influxdb_data:
+  grafana_data:
+  nodered_data:

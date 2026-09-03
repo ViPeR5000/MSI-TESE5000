@@ -1,0 +1,378 @@
+[
+ {
+  "id": "charlie0001",
+  "type": "tab",
+  "label": "Charlie SCADA",
+  "disabled": false,
+  "info": ""
+ },
+ {
+  "id": "charlie0002",
+  "type": "mqtt-broker",
+  "name": "EMQX Charlie",
+  "broker": "192.168.30.100",
+  "port": "1883",
+  "clientid": "scada-c-nodered",
+  "autoConnect": true,
+  "keepalive": "60",
+  "cleansession": true
+ },
+ {
+  "id": "charlie0003",
+  "type": "ui_base",
+  "theme": {
+   "name": "theme-dark",
+   "lightTheme": {
+    "default": true
+   },
+   "darkTheme": {
+    "default": true,
+    "baseColor": "#a78bfa",
+    "baseFont": "-apple-system"
+   },
+   "customTheme": {
+    "name": "Charlie",
+    "default": false
+   }
+  },
+  "site": {
+   "name": "MSI-TESE Charlie",
+   "hideToolbar": "false",
+   "allowSwipe": "false",
+   "dateFormat": "DD/MM/YYYY HH:mm:ss"
+  }
+ },
+ {
+  "id": "charlie0004",
+  "type": "ui_tab",
+  "name": "Charlie",
+  "icon": "security",
+  "order": 1,
+  "disabled": false
+ },
+ {
+  "id": "charlie0005",
+  "type": "ui_group",
+  "name": "Telemetria (AES-128-GCM)",
+  "tab": "charlie0004",
+  "order": 1,
+  "disp": true,
+  "width": "6"
+ },
+ {
+  "id": "charlie0006",
+  "type": "ui_group",
+  "name": "Cripto & Controlo",
+  "tab": "charlie0004",
+  "order": 2,
+  "disp": true,
+  "width": "6"
+ },
+ {
+  "id": "charlie0007",
+  "type": "inject",
+  "name": "tick 15s",
+  "props": [
+   {
+    "p": "payload"
+   }
+  ],
+  "repeat": "15",
+  "once": true,
+  "onceDelay": "2",
+  "topic": "",
+  "payload": "",
+  "payloadType": "date",
+  "wires": [
+   [
+    "charlie0008"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0008",
+  "type": "function",
+  "name": "set PKI url",
+  "func": "msg.method='GET';msg.url='https://192.168.30.200:8000/monitor';msg.headers={};return msg;",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0009"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0009",
+  "type": "http request",
+  "name": "",
+  "method": "use",
+  "ret": "txt",
+  "url": "",
+  "wires": [
+   [
+    "charlie0010"
+   ]
+  ],
+  "z": "charlie0001",
+  "tls": "charlietls01"
+ },
+ {
+  "id": "charlie0010",
+  "type": "function",
+  "name": "cache keys",
+  "func": "var d;try{d=JSON.parse(msg.payload);}catch(e){node.error('PKI parse: '+e);return null;}\nvar keys=(d.recent_session_keys_b64||[]).slice().reverse();\nvar ak=d.active_session_key_b64;\nif(ak&&keys.indexOf(ak)<0)keys.unshift(ak);\nif(keys.length){flow.set('pki_keys',keys);node.status({fill:'green',shape:'dot',text:keys.length+' chave(s)'});}\nelse node.status({fill:'yellow',shape:'ring',text:'sem chave no PKI'});\nreturn null;",
+  "outputs": 1,
+  "wires": [
+   []
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0011",
+  "type": "mqtt in",
+  "name": "",
+  "topic": "CHARLIE/+/telemetria",
+  "qos": "1",
+  "broker": "charlie0002",
+  "wires": [
+   [
+    "charlie0012"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0012",
+  "type": "function",
+  "name": "AES-GCM decrypt telem",
+  "func": "const crypto=global.get('crypto');\nvar keys=flow.get('pki_keys')||[];\nif(!keys.length){node.status({fill:'red',shape:'ring',text:'sem chave'});return null;}\nvar wire=Buffer.from(String(msg.payload).trim(),'base64');\nif(wire.length<28){return null;}\nvar iv=wire.subarray(0,12),tag=wire.subarray(wire.length-16),ct=wire.subarray(12,wire.length-16);\nfor(var i=0;i<keys.length;i++){\n  try{\n    var key=Buffer.from(keys[i],'base64').subarray(0,16);\n    var dec=crypto.createDecipheriv('aes-128-gcm',key,iv);dec.setAuthTag(tag);\n    var pt=Buffer.concat([dec.update(ct),dec.final()]);\n    msg.payload=JSON.parse(pt.toString('utf8'));\n    var parts=String(msg.topic).split('/');\n    if(parts.length>=2){if(parts[2]==='estado')flow.set('relay_mac',parts[1]);else flow.set('node_mac',parts[1]);}\n    node.status({fill:'green',shape:'dot',text:'OK'});\n    return msg;\n  }catch(e){}\n}\nnode.status({fill:'yellow',shape:'ring',text:'decrypt falhou'});return null;\n",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0013",
+    "charlie0014",
+    "charlie0017"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0013",
+  "type": "function",
+  "name": "temp",
+  "func": "if(msg.payload.temp===undefined)return null;msg.payload=msg.payload.temp;return msg;",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0015"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0014",
+  "type": "function",
+  "name": "hum",
+  "func": "if(msg.payload.hum===undefined)return null;msg.payload=msg.payload.hum;return msg;",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0016"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0015",
+  "type": "ui_gauge",
+  "name": "",
+  "group": "charlie0005",
+  "order": 1,
+  "width": "3",
+  "height": "3",
+  "gtype": "gage",
+  "title": "Temperatura",
+  "label": "\u00b0C",
+  "format": "{{value}}",
+  "min": "0",
+  "max": "50",
+  "colors": [
+   "#00b3fd",
+   "#5cd65c",
+   "#ff4d4d"
+  ],
+  "seg1": "20",
+  "seg2": "35",
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0016",
+  "type": "ui_gauge",
+  "name": "",
+  "group": "charlie0005",
+  "order": 2,
+  "width": "3",
+  "height": "3",
+  "gtype": "gage",
+  "title": "Humidade",
+  "label": "%",
+  "format": "{{value}}",
+  "min": "0",
+  "max": "100",
+  "colors": [
+   "#f5d142",
+   "#5cd65c",
+   "#00b3fd"
+  ],
+  "seg1": "30",
+  "seg2": "70",
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0017",
+  "type": "ui_text",
+  "name": "",
+  "group": "charlie0005",
+  "order": 3,
+  "width": "6",
+  "height": "1",
+  "label": "N\u00f3",
+  "format": "{{msg.payload.node}} \u00b7 {{msg.payload.fw}}",
+  "layout": "row-spread",
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0018",
+  "type": "mqtt in",
+  "name": "",
+  "topic": "CHARLIE/+/estado",
+  "qos": "1",
+  "broker": "charlie0002",
+  "wires": [
+   [
+    "charlie0019"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0019",
+  "type": "function",
+  "name": "AES-GCM decrypt estado",
+  "func": "const crypto=global.get('crypto');\nvar keys=flow.get('pki_keys')||[];\nif(!keys.length){node.status({fill:'red',shape:'ring',text:'sem chave'});return null;}\nvar wire=Buffer.from(String(msg.payload).trim(),'base64');\nif(wire.length<28){return null;}\nvar iv=wire.subarray(0,12),tag=wire.subarray(wire.length-16),ct=wire.subarray(12,wire.length-16);\nfor(var i=0;i<keys.length;i++){\n  try{\n    var key=Buffer.from(keys[i],'base64').subarray(0,16);\n    var dec=crypto.createDecipheriv('aes-128-gcm',key,iv);dec.setAuthTag(tag);\n    var pt=Buffer.concat([dec.update(ct),dec.final()]);\n    msg.payload=JSON.parse(pt.toString('utf8'));\n    var parts=String(msg.topic).split('/');\n    if(parts.length>=2){if(parts[2]==='estado')flow.set('relay_mac',parts[1]);else flow.set('node_mac',parts[1]);}\n    node.status({fill:'green',shape:'dot',text:'OK'});\n    return msg;\n  }catch(e){}\n}\nnode.status({fill:'yellow',shape:'ring',text:'decrypt falhou'});return null;\n",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0020"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0020",
+  "type": "ui_text",
+  "name": "",
+  "group": "charlie0006",
+  "order": 1,
+  "width": "6",
+  "height": "1",
+  "label": "Estado do Relay",
+  "format": "{{msg.payload.relay ? 'LIGADO' : 'DESLIGADO'}}",
+  "layout": "row-spread",
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0021",
+  "type": "ui_button",
+  "name": "",
+  "group": "charlie0006",
+  "order": 2,
+  "width": "3",
+  "height": "1",
+  "label": "Relay ON",
+  "color": "",
+  "bgcolor": "#2e7d32",
+  "payload": "relay_on",
+  "payloadType": "str",
+  "topic": "",
+  "wires": [
+   [
+    "charlie0023"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0022",
+  "type": "ui_button",
+  "name": "",
+  "group": "charlie0006",
+  "order": 3,
+  "width": "3",
+  "height": "1",
+  "label": "Relay OFF",
+  "color": "",
+  "bgcolor": "#c62828",
+  "payload": "relay_off",
+  "payloadType": "str",
+  "topic": "",
+  "wires": [
+   [
+    "charlie0023"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0023",
+  "type": "function",
+  "name": "AES-GCM encrypt cmd",
+  "func": "const crypto=global.get('crypto');\nvar keys=flow.get('pki_keys')||[];\nvar mac=flow.get('relay_mac')||flow.get('node_mac');\nif(!keys.length||!mac){node.warn('sem chave ou MAC de relay');return null;}\nvar key=Buffer.from(keys[0],'base64').subarray(0,16);\nvar iv=crypto.randomBytes(12);\nvar cmd=Buffer.from(JSON.stringify({command:msg.payload}),'utf8');\nvar c=crypto.createCipheriv('aes-128-gcm',key,iv);\nvar ct=Buffer.concat([c.update(cmd),c.final()]);var tag=c.getAuthTag();\nmsg.payload=Buffer.concat([iv,ct,tag]).toString('base64');\nmsg.topic='CHARLIE/'+mac+'/comando';return msg;\n",
+  "outputs": 1,
+  "wires": [
+   [
+    "charlie0024"
+   ]
+  ],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0024",
+  "type": "mqtt out",
+  "name": "",
+  "topic": "",
+  "qos": "1",
+  "retain": "",
+  "broker": "charlie0002",
+  "wires": [],
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlie0025",
+  "type": "ui_text",
+  "name": "",
+  "group": "charlie0006",
+  "order": 4,
+  "width": "6",
+  "height": "1",
+  "label": "Stack",
+  "format": "ECDH-P384 + AES-128-GCM",
+  "layout": "row-spread",
+  "z": "charlie0001"
+ },
+ {
+  "id": "charlietls01",
+  "type": "tls-config",
+  "name": "PKI Charlie CA",
+  "cert": "",
+  "key": "",
+  "ca": "/home/pi/tls/server.crt",
+  "certname": "",
+  "keyname": "",
+  "caname": "server.crt",
+  "servername": "192.168.30.200",
+  "verifyservercert": true
+ }
+]

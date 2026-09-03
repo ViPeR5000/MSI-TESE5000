@@ -1,0 +1,79 @@
+{
+  "uid": "suricata-vlan",
+  "title": "MSI-TESE · Suricata by VLAN",
+  "tags": ["msi-tese", "suricata", "ids", "vlan"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "DS",
+        "type": "datasource",
+        "query": "influxdb",
+        "current": { "text": "InfluxDB MSI-TESE", "value": "dfri19baoc0zke" },
+        "hide": 0
+      },
+      {
+        "name": "vlan",
+        "type": "query",
+        "datasource": { "type": "influxdb", "uid": "${DS}" },
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"telemetry\", tag: \"vlan\", predicate: (r) => r._measurement == \"suricata_alerts\", start: -30d)",
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "100", "value": "100" },
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "barchart", "title": "Alerts by VLAN (all)",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "options": { "xField": "vlan", "orientation": "horizontal" },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\")\n  |> group(columns: [\"vlan\"])\n  |> sum()\n  |> group()\n  |> rename(columns: {_value: \"alerts\"})\n  |> sort(columns: [\"alerts\"], desc: true)" } ]
+    },
+    {
+      "id": 2, "type": "piechart", "title": "Alerts by phase (all)",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\")\n  |> group(columns: [\"phase\"])\n  |> sum()\n  |> group()\n  |> rename(columns: {phase: \"_field\"})" } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Total — VLAN $vlan",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 100 } ] } } },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\" and r.vlan == \"$vlan\")\n  |> sum()" } ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Alerts over time by VLAN (all)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } } },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\")\n  |> group(columns: [\"vlan\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> map(fn: (r) => ({r with _field: \"VLAN \" + r.vlan}))" } ]
+    },
+    {
+      "id": 5, "type": "table", "title": "Top Signatures — VLAN $vlan",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\" and r.vlan == \"$vlan\")\n  |> group(columns: [\"signature\", \"category\"])\n  |> sum()\n  |> group()\n  |> rename(columns: {_value: \"alerts\"})\n  |> sort(columns: [\"alerts\"], desc: true)\n  |> limit(n: 20)\n  |> keep(columns: [\"signature\", \"category\", \"alerts\"])" } ]
+    },
+    {
+      "id": 6, "type": "table", "title": "Top Source IPs — VLAN $vlan",
+      "gridPos": { "h": 9, "w": 6, "x": 12, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\" and r.vlan == \"$vlan\")\n  |> group(columns: [\"src_ip\"])\n  |> sum()\n  |> group()\n  |> rename(columns: {_value: \"alerts\"})\n  |> sort(columns: [\"alerts\"], desc: true)\n  |> limit(n: 15)\n  |> keep(columns: [\"src_ip\", \"alerts\"])" } ]
+    },
+    {
+      "id": 7, "type": "piechart", "title": "Severity — VLAN $vlan",
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "${DS}" },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"suricata_alerts\" and r._field == \"count\" and r.vlan == \"$vlan\")\n  |> group(columns: [\"severity\"])\n  |> sum()\n  |> group()\n  |> map(fn: (r) => ({r with _field: \"sev \" + r.severity}))" } ]
+    }
+  ]
+}

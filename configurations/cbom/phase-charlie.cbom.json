@@ -1,0 +1,162 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:c3a00000-0000-4000-8000-000000000003",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-24T00:00:00Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "phase-charlie",
+      "name": "MSI-TESE Phase Charlie",
+      "description": "Fully classical/conventional ICS/IIoT testbed (control group for the PQC cost). Conventional stack end to end: ECDH/ECDSA secp384r1 + HKDF-SHA256 + AES-128-GCM + TLS 1.3. No PQC, no LWC. PLANNED — not yet implemented."
+    },
+    "properties": [
+      { "name": "msi:vlan", "value": "30 (192.168.30.0/24)" },
+      { "name": "msi:status", "value": "planned" },
+      { "name": "msi:note", "value": "Security level matched to Bravo (NIST L3 -> P-384). Quantum-vulnerable asymmetric primitives (Shor) — that exposure is the point of the comparison." }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:kex:ecdh-p384",
+      "name": "ECDH secp384r1",
+      "description": "Elliptic-curve Diffie-Hellman key agreement; classical analog of Kyber768 at matched security category.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "1.2.840.10045.2.1",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "curve": "secp384r1",
+          "executionEnvironment": "hardware",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "keyderive"],
+          "classicalSecurityLevel": 192,
+          "nistQuantumSecurityLevel": 0
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:sig:ecdsa-p384",
+      "name": "ECDSA secp384r1",
+      "description": "ECDSA with SHA-384; classical analog of ML-DSA-65 for control-command authenticity/integrity.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "1.2.840.10045.4.3.3",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "curve": "secp384r1",
+          "executionEnvironment": "hardware",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "sign", "verify"],
+          "classicalSecurityLevel": 192,
+          "nistQuantumSecurityLevel": 0
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:kdf:hkdf-sha256",
+      "name": "HKDF-SHA256",
+      "description": "Derives the 16-byte AES-GCM session key from the 48-byte ECDH shared secret (Bravo truncates the Kyber secret instead).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kdf",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keyderive"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ae:aes-128-gcm",
+      "name": "AES-128-GCM",
+      "description": "Conventional classical AEAD at the field layer (replaces Bravo's ASCON LWC). Hardware-accelerated on ESP32. Wire format: Base64(iv[12] | ciphertext | tag[16]).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1.6",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "128",
+          "mode": "gcm",
+          "executionEnvironment": "hardware",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "encrypt", "decrypt", "tag"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:proto:tls13",
+      "name": "TLS 1.3",
+      "description": "Transport security (HTTPS classical key server, MQTTS). Same classical transport as Bravo.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "1.3"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:ecdh-shared-secret",
+      "name": "ECDH shared secret",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "shared-secret",
+          "size": 384,
+          "state": "active"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:aes-session-key",
+      "name": "AES-GCM session key",
+      "description": "HKDF-SHA256(ECDH shared secret) -> 16 bytes; rotated hourly or on demand.",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key",
+          "size": 128,
+          "state": "active"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:ecdsa-priv",
+      "name": "ECDSA P-384 private key",
+      "description": "TPM 2.0 NATIVE keygen/storage (ECC P-384 is natively supported, unlike Bravo's PQC keys).",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key",
+          "state": "active"
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    { "ref": "phase-charlie", "dependsOn": ["crypto:kex:ecdh-p384", "crypto:sig:ecdsa-p384", "crypto:kdf:hkdf-sha256", "crypto:ae:aes-128-gcm", "crypto:proto:tls13"] },
+    { "ref": "crypto:kex:ecdh-p384", "dependsOn": ["material:ecdh-shared-secret"] },
+    { "ref": "crypto:kdf:hkdf-sha256", "dependsOn": ["material:ecdh-shared-secret"] },
+    { "ref": "material:aes-session-key", "dependsOn": ["crypto:kdf:hkdf-sha256"] },
+    { "ref": "crypto:ae:aes-128-gcm", "dependsOn": ["material:aes-session-key"] },
+    { "ref": "crypto:sig:ecdsa-p384", "dependsOn": ["material:ecdsa-priv"] }
+  ]
+}

@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # ====================================================================
+  # EMQX MQTT Broker (Layer 1 - Edge Gateway / Message Router)
+  # ====================================================================
+  emqx:
+    image: emqx/emqx:5.5.0
+    container_name: msi-emqx-broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883"      # MQTT TCP Port
+      - "8083:8083"      # MQTT WebSocket Port
+      - "8883:8883"      # MQTTS (MQTT over SSL) Port
+      - "18083:18083"    # EMQX Web Dashboard (Console)
+    environment:
+      - EMQX_NODE__NAME=emqx@node1.msi
+      - EMQX_CLUSTER__DISCOVERY_STRATEGY=manual
+      - EMQX_DASHBOARD__BOOTSTRAP_USER_PASSWD=adminpassword123
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+    networks:
+      - msi-network
+
+  # ====================================================================
+  # InfluxDB (Time-Series Database to store sensor telemetry)
+  # ====================================================================
+  influxdb:
+    image: influxdb:2.7.5-alpine
+    container_name: msi-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword123
+      - DOCKER_INFLUXDB_INIT_ORG=msi-tese
+      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token-12345678
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - msi-network
+
+  # ====================================================================
+  # Grafana (Visual Analytics Dashboard)
+  # ====================================================================
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: msi-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=adminpassword123
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - influxdb
+    networks:
+      - msi-network
+
+  # ====================================================================
+  # PQC Ingestion Bridge (Decryption Layer & Storage Broker)
+  # ====================================================================
+  pqc-bridge:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: msi-pqc-ingestion-bridge
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER_HOST=emqx
+      - MQTT_BROKER_PORT=1883
+      - MQTT_TOPIC=BRAVO/#
+      - PQC_SERVER_URL=https://192.168.20.200:8000/monitor
+      - PQC_TLS_CERT_PATH=/tls/server.crt
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=my-super-secret-auth-token-12345678
+      - INFLUXDB_ORG=msi-tese
+      - INFLUXDB_BUCKET=telemetry
+    volumes:
+      - /home/pi/msi-bridge/tls:/tls:ro
+    depends_on:
+      - emqx
+      - influxdb
+    networks:
+      - msi-network
+
+  # ====================================================================
+  # PQC Edge Gateway Translator (LWC ASCON -> PQC Kyber/Dilithium)
+  # ====================================================================
+  pqc-gateway-translator:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: msi-pqc-gateway-translator
+    restart: unless-stopped
+    command: python -u pqc_gateway_translator.py
+    environment:
+      - MQTT_BROKER_HOST=emqx
+      - MQTT_BROKER_PORT=1883
+      - PQC_SERVER_URL=https://192.168.20.200:8000
+      - PQC_TLS_CERT_PATH=/tls/server.crt
+    volumes:
+      - /home/pi/msi-bridge/tls:/tls:ro
+    depends_on:
+      - emqx
+    networks:
+      - msi-network
+
+  # ====================================================================
+  # PLC IEC 61131-3 Simulator (Kyber768/Dilithium3 Secure Control)
+  # ====================================================================
+  plc-simulator:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: msi-plc-simulator
+    restart: unless-stopped
+    command: python -u plc_simulator.py
+    environment:
+      - MQTT_BROKER_HOST=emqx
+      - MQTT_BROKER_PORT=1883
+      - PQC_SERVER_URL=https://192.168.20.200:8000
+      - PQC_TLS_CERT_PATH=/tls/server.crt
+    volumes:
+      - /home/pi/msi-bridge/tls:/tls:ro
+    depends_on:
+      - emqx
+    networks:
+      - msi-network
+
+volumes:
+  emqx-data:
+  emqx-log:
+  influxdb-data:
+  grafana-data:
+
+networks:
+  msi-network:
+    name: msi-network
+    driver: bridge

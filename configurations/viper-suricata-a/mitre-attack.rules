@@ -1,0 +1,79 @@
+# =============================================================================
+# MSI-TESE — MITRE ATT&CK-mapped detection rules (Alpha phase, VLAN 100)
+# Maps the attack techniques from the thesis architecture diagram (APT Attacker
+# red paths) to network-observable Suricata signatures. Each rule carries
+# metadata: mitre_technique_id / mitre_tactic for ATT&CK Navigator export.
+#
+# Diagram technique -> rule mapping:
+#   T1041      Exfiltration Over C2 Channel        -> 1009001-1009002
+#   T1537      Transfer Data to Cloud Account       -> 1009003-1009004
+#   T1552.001  Unsecured Credentials: In Files      -> 1009005
+#   T1005      Data from Local System               -> 1009006-1009007
+#   T1074      Data Staged                          -> 1009008-1009009
+#   T1014      Rootkit / firmware persistence       -> 1009010-1009011
+#
+# Field/ICS assets that must never egress to the Internet:
+#   ESP32 .11/.12/.13, OpenPLC .50  (gateway/scada/sensor legitimately update)
+# HOME_NET/EXTERNAL_NET come from suricata.yaml (EXTERNAL_NET = public Internet).
+# SID range 1009xxx. Deploy: /etc/suricata/rules/mitre-attack.rules
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# T1041 — Exfiltration Over C2 Channel (TA0010 Exfiltration)
+# Field devices only reach internal services (MQTT .100, PQC .200); any outbound
+# TCP to the public Internet is anomalous (NTP is UDP/123, so excluded here).
+# -----------------------------------------------------------------------------
+alert tcp [192.168.100.11,192.168.100.12,192.168.100.13,192.168.100.50] any -> $EXTERNAL_NET any (msg:"MSI-TESE T1041 ICS field asset outbound to Internet — possible C2/exfiltration"; flow:to_server,established; threshold:type limit,track by_src,count 1,seconds 30; metadata:mitre_technique_id T1041, mitre_tactic TA0010; classtype:trojan-activity; sid:1009001; rev:1;)
+
+# Large sustained outbound payload from any ICS asset to the Internet — bulk exfil
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"MSI-TESE T1041 large outbound transfer to Internet — bulk exfiltration"; flow:to_server,established; dsize:>1400; threshold:type both,track by_src,count 50,seconds 60; metadata:mitre_technique_id T1041, mitre_tactic TA0010; classtype:trojan-activity; sid:1009002; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# T1537 — Transfer Data to Cloud Account (TA0010 Exfiltration)
+# -----------------------------------------------------------------------------
+# TLS SNI to a public cloud-storage provider from an ICS asset
+alert tls $HOME_NET any -> $EXTERNAL_NET 443 (msg:"MSI-TESE T1537 ICS asset TLS to public cloud storage provider"; flow:to_server,established; tls.sni; pcre:"/(amazonaws\.com|blob\.core\.windows\.net|storage\.googleapis\.com|dropbox(api)?\.com|mega\.nz|backblazeb2\.com|wetransfer\.com)$/i"; metadata:mitre_technique_id T1537, mitre_tactic TA0010; classtype:policy-violation; sid:1009003; rev:1;)
+
+# Field device pushing objects into S3/MiniO-style storage (PUT to object API) — direct-to-cloud staging
+alert http [192.168.100.11,192.168.100.12,192.168.100.13,192.168.100.50] any -> any [9000,9001,443] (msg:"MSI-TESE T1537 field device object-storage upload (S3/MiniO API)"; flow:to_server,established; http.method; content:"PUT"; metadata:mitre_technique_id T1537, mitre_tactic TA0010; classtype:policy-violation; sid:1009004; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# T1552.001 — Unsecured Credentials: Credentials In Files (TA0006 Credential Access)
+# HTTP requests reaching for secret/credential files on any service
+# -----------------------------------------------------------------------------
+alert http any any -> $HOME_NET any (msg:"MSI-TESE T1552.001 access to credential/secret file"; flow:to_server,established; http.uri; pcre:"/(\.env|\.pem|\.key|id_rsa|\.htpasswd|wp-config|\/\.git\/config|\.tpm|server_kyber\.priv|server_dilithium|equipment_credentials|\.aws\/credentials|\.ssh\/)/i"; metadata:mitre_technique_id T1552.001, mitre_tactic TA0006; classtype:attempted-recon; sid:1009005; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# T1005 — Data from Local System (TA0009 Collection)
+# -----------------------------------------------------------------------------
+# Modbus FC03 Read Holding Registers with a large quantity (>32 regs) — process-data harvesting
+# PDU: [MBAP 7B][FC=0x03][start addr 2B][quantity 2B]; quantity at offset +3 from FC
+alert tcp any any -> 192.168.100.50 502 (msg:"MSI-TESE T1005 Modbus bulk register read — process data collection"; flow:to_server,established; content:"|03|"; offset:7; depth:1; byte_test:2,>,32,3,relative; metadata:mitre_technique_id T1005, mitre_tactic TA0009; classtype:attempted-recon; sid:1009006; rev:1;)
+
+# Bulk InfluxDB read (data harvested from the historian) from a non-authorized host
+alert http ![192.168.100.60,192.168.100.250] any -> 192.168.100.60 8086 (msg:"MSI-TESE T1005 InfluxDB historian bulk read — data from local system"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/api/v2/query"; threshold:type threshold,track by_src,count 20,seconds 60; metadata:mitre_technique_id T1005, mitre_tactic TA0009; classtype:policy-violation; sid:1009007; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# T1074 — Data Staged (TA0009 Collection)
+# Collected data compressed/archived and moved to a staging location
+# -----------------------------------------------------------------------------
+# Archive (ZIP / GZIP) uploaded over HTTP — staging of collected data
+alert http any any -> $HOME_NET any (msg:"MSI-TESE T1074.001 archive upload (ZIP) — data staged"; flow:to_server,established; http.request_body; content:"PK|03 04|"; startswith; metadata:mitre_technique_id T1074.001, mitre_tactic TA0009; classtype:policy-violation; sid:1009008; rev:1;)
+
+alert http any any -> $HOME_NET any (msg:"MSI-TESE T1074.001 archive upload (GZIP) — data staged"; flow:to_server,established; http.request_body; content:"|1f 8b 08|"; startswith; metadata:mitre_technique_id T1074.001, mitre_tactic TA0009; classtype:policy-violation; sid:1009009; rev:1;)
+
+
+# -----------------------------------------------------------------------------
+# T1014 — Rootkit / firmware persistence (TA0003 Persistence / TA0005 Defense Evasion)
+# Tampering with device firmware or PLC logic to persist below the OS/app layer
+# -----------------------------------------------------------------------------
+# Firmware OTA upload to a field device (implant / persistent rootkit via firmware)
+alert http any any -> [192.168.100.11,192.168.100.12,192.168.100.13] 80 (msg:"MSI-TESE T1014 firmware OTA upload — persistence/rootkit implant"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/ota"; metadata:mitre_technique_id T1014, mitre_tactic TA0003; classtype:policy-violation; sid:1009010; rev:1;)
+
+# OpenPLC control-logic program upload — persistent malicious ladder/ST logic
+alert http any any -> 192.168.100.50 8080 (msg:"MSI-TESE T1014 OpenPLC program upload — persistent malicious control logic"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/upload-program"; metadata:mitre_technique_id T1014, mitre_tactic TA0003; classtype:policy-violation; sid:1009011; rev:1;)

@@ -1,0 +1,137 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:b2a00000-0000-4000-8000-000000000002",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-24T00:00:00Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "phase-bravo",
+      "name": "MSI-TESE Phase Bravo",
+      "description": "PQC-hardened ICS/IIoT testbed. Post-quantum at the application layer (Kyber768 KEM + ML-DSA-65 signatures), ASCON-128 AEAD at the field layer, classical TLS 1.3 transport."
+    },
+    "properties": [
+      { "name": "msi:vlan", "value": "30->20 (192.168.20.0/24)" },
+      { "name": "msi:note", "value": "PQC is application-layer only; TLS transport remains classical." }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:kem:kyber768",
+      "name": "Kyber768",
+      "description": "Lattice KEM (liboqs round-3 parameter set) for session-key establishment; ESP32<->server.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kem",
+          "parameterSetIdentifier": "768",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"],
+          "nistQuantumSecurityLevel": 3
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:sig:ml-dsa-65",
+      "name": "ML-DSA-65",
+      "description": "Module-lattice signature (FIPS 204; Dilithium3 parameter set) for control-command authenticity/integrity.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.3.18",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "parameterSetIdentifier": "65",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["keygen", "sign", "verify"],
+          "nistQuantumSecurityLevel": 3
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ae:ascon-128",
+      "name": "ASCON-128",
+      "description": "Lightweight AEAD (v1.2, rate 64, a=12, b=6, 128-bit tag) at the field layer; ESP32 telemetry encryption. KAT-verified against official LWC vectors.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "128",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "generic",
+          "certificationLevel": ["none"],
+          "cryptoFunctions": ["encrypt", "decrypt", "tag"],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 1
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:proto:tls13",
+      "name": "TLS 1.3",
+      "description": "Transport security for HTTPS (PQC key server :8000) and MQTTS (:8883). Classical cipher suites — NOT post-quantum.",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "1.3"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:kyber-shared-secret",
+      "name": "Kyber768 shared secret",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "shared-secret",
+          "size": 256,
+          "state": "active"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:ascon-session-key",
+      "name": "ASCON session key",
+      "description": "First 16 bytes of the Kyber shared secret; rotated hourly or on demand.",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key",
+          "size": 128,
+          "state": "active"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "material:ml-dsa-priv",
+      "name": "ML-DSA-65 private key",
+      "description": "Sealed with TPM 2.0 when present; software file-seal fallback (PQC keys are not natively storable in TPM 2.0).",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key",
+          "state": "active"
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    { "ref": "phase-bravo", "dependsOn": ["crypto:kem:kyber768", "crypto:sig:ml-dsa-65", "crypto:ae:ascon-128", "crypto:proto:tls13"] },
+    { "ref": "crypto:kem:kyber768", "dependsOn": ["material:kyber-shared-secret"] },
+    { "ref": "material:ascon-session-key", "dependsOn": ["material:kyber-shared-secret"] },
+    { "ref": "crypto:ae:ascon-128", "dependsOn": ["material:ascon-session-key"] },
+    { "ref": "crypto:sig:ml-dsa-65", "dependsOn": ["material:ml-dsa-priv"] }
+  ]
+}
