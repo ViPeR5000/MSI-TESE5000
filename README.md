@@ -5,35 +5,7 @@ Este repositório contém a implementação prática e experimental desenvolvida
 
 O objetivo do projeto é demonstrar a viabilidade, performance e segurança de uma arquitetura de **Defesa em Profundidade** para redes industriais (ICS / IIoT), integrando algoritmos de **Criptografia Pós-Quântica (PQC)** na camada Edge/Gateway e de **Criptografia Leve (LWC)** na camada de campo (microcontroladores de recursos restritos).
 
----
 
-## 📐 Arquitetura do Sistema (Modelo ISA-95)
-
-A arquitetura do testbed foi desenhada em estrita conformidade com a Pirâmide de Automação Industrial (**ISA-95**):
-
-```mermaid
-graph TD
-    subgraph Layer2_3 [Layer 2/3: Supervisão & Operações]
-        Grafana[Grafana Dashboard] <--> InfluxDB[(InfluxDB v2 TSDB)]
-    end
-
-    subgraph Layer1 [Layer 1: Edge & Gateway]
-        EMQX[EMQX MQTT Broker] <--> Bridge[PQC Ingestion Bridge]
-        PQC[PQC Key Management Server] <--> Bridge
-    end
-
-    subgraph Layer0 [Layer 0: Campo / Field]
-        ESP_Bravo[ESP32 Bravo Node] -- ASCON Encrypted telemetry --> EMQX
-        ESP_Bravo -- Kyber768 Handshake --> PQC
-    end
-
-    Bridge -- Decrypted JSON Data --> InfluxDB
-    style ESP_Bravo fill:#0d9488,stroke:#115e59,stroke-width:2px,color:#fff
-    style PQC fill:#7c3aed,stroke:#5b21b6,stroke-width:2px,color:#fff
-    style EMQX fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#fff
-    style Bridge fill:#d97706,stroke:#b45309,stroke-width:2px,color:#fff
-    style InfluxDB fill:#16a34a,stroke:#15803d,stroke-width:2px,color:#fff
-```
 
 ---
 
