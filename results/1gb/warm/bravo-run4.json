@@ -1,0 +1,14 @@
+{
+  "algo": "ASCON-128",
+  "time_s": 54.559,
+  "in_bytes": 1073741856,
+  "out_bytes": 1073741888,
+  "throughput_MBps": 19.68,
+  "nonce": "4320de88a576b11f002652c38d6d5da8",
+  "tag": "8c5ccab18825e04241f0ebe5da55ca33",
+  "phase": "bravo",
+  "run": 4,
+  "mode": "warm",
+  "host": "viper-gateway-b",
+  "ts": "2026-08-28T01:15:08"
+}

@@ -1,0 +1,18 @@
+
+===== ALPHA (192.168.100.60) =====
+  [OK]   CC8DA20C7AF8   lat=35ms loss=0.6%                         
+  [OK]   CC8DA20C9C14   T=24.3C H=62% lat=25ms loss=0.5%           
+  [OK]   DCB4D90B7B78   T=28.4C H=43% lat=64ms loss=0.5%           
+
+===== BRAVO (192.168.20.60) =====
+  [OK]   CC8DA20CDB50   T=23.1C H=61% lat=204ms loss=0.7% hs=3586ms/30m-ago 
+  [OK]   DCB4D90A0578   T=22.9C H=31% lat=298ms loss=0.5% hs=1388ms/30m-ago 
+  [OK]   DCB4D90B5258   lat=247ms loss=0.5% hs=2731ms/30m-ago      
+
+===== CHARLIE (192.168.30.60) =====
+  [OK]   CC8DA20CE224   lat=21ms loss=0.7% hs=670ms/16m-ago        
+  [OK]   CC8DA20D4484   T=23.3C H=58% lat=19ms loss=0.6% hs=756ms/16m-ago 
+  [OK]   E8F60A859440   T=25.2C H=52% lat=265ms loss=0.6% hs=675ms/16m-ago 
+
+========================================
+Resultado: TUDO OK

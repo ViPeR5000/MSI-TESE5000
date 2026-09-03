@@ -1,0 +1,33 @@
+MSI-TESE — Run de 24h — 2026-07-21 (00:00-23:59 WEST)
+Recolhido: 2026-07-22 00:18:10 WEST
+
+InfluxDB CSV:
+alpha_energy.csv
+alpha_suricata_alerts.csv
+alpha_suricata_stats.csv
+alpha_telemetry_environment.csv
+alpha_telemetry_handshake.csv
+alpha_telemetry_performance.csv
+alpha_telemetry_relay.csv
+bravo_energy.csv
+bravo_suricata_alerts.csv
+bravo_suricata_stats.csv
+bravo_telemetry_environment.csv
+bravo_telemetry_handshake.csv
+bravo_telemetry_performance.csv
+bravo_telemetry_relay.csv
+charlie_energy.csv
+charlie_suricata_alerts.csv
+charlie_suricata_stats.csv
+charlie_telemetry_environment.csv
+charlie_telemetry_handshake.csv
+charlie_telemetry_performance.csv
+charlie_telemetry_relay.csv
+
+pcaps:
+-rwxrwxrwx 1 viper5000 viper5000 477M Jul 21 21:23 alpha-vlan100.pcap
+-rwxrwxrwx 1 viper5000 viper5000  53M Jul 22 00:10 alpha-vlan100.pcap1
+-rwxrwxrwx 1 viper5000 viper5000 259M Jul 22 00:10 bravo-vlan20.pcap
+-rwxrwxrwx 1 viper5000 viper5000 276M Jul 22 00:10 charlie-vlan30.pcap
+
+alertas Suricata: 10 linhas

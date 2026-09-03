@@ -1,0 +1,12 @@
+{
+  "algo": "AES-128-GCM",
+  "time_s": 18.361,
+  "in_bytes": 1073741824,
+  "out_bytes": 1073741824,
+  "throughput_MBps": 58.48,
+  "phase": "charlie",
+  "run": 5,
+  "mode": "mem",
+  "host": "viper-gateway-b",
+  "ts": "2026-08-28T01:28:46"
+}

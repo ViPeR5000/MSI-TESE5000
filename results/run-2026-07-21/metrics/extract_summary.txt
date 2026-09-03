@@ -1,0 +1,45 @@
+
+Energia (Shelly):
+  alpha      10.6 W médio, 256.3 Wh na janela
+  bravo      15.5 W médio, 375.8 Wh na janela
+  charlie    11.8 W médio, 284.5 Wh na janela
+  test       12.2 W médio, 281.7 Wh na janela
+
+métrica                  alpha         bravo       charlie
+----------------------------------------------------------
+avg_lat_ms                46.1          40.9           175
+jitter_ms                 71.5            54           103
+throughput_bps              67           106          99.3
+loss_pct                  0.68          0.65          0.81
+deadline_pct                 0             0             0
+ram_mb                     0.1           0.1           0.1
+crypto_cpu_us                0           361           661
+crypto_ram_kb                0           0.2          0.17
+hs_latency_ms                —           834           746
+hs_req_bytes                 —            26           178
+hs_resp_bytes                —      1.54e+03           153
+
+Deltas (mediana; % = overhead relativo):
+  Alpha→Charlie (custo de ter cripto):
+    avg_lat_ms             46.1 → 175        (+280.3%)
+    jitter_ms              71.5 → 103        (+43.6%)
+    throughput_bps           67 → 99.3       (+48.2%)
+    loss_pct               0.68 → 0.81       (+19.1%)
+    deadline_pct              0 → 0          (+inf%)
+    ram_mb                  0.1 → 0.1        (+0.0%)
+    crypto_cpu_us             0 → 661        (+inf%)
+    crypto_ram_kb             0 → 0.17       (+inf%)
+  Charlie→Bravo (custo de ser PQC):
+    avg_lat_ms              175 → 40.9       (-76.7%)
+    jitter_ms               103 → 54         (-47.4%)
+    throughput_bps         99.3 → 106        (+7.3%)
+    loss_pct               0.81 → 0.65       (-19.8%)
+    deadline_pct              0 → 0          (+inf%)
+    ram_mb                  0.1 → 0.1        (+0.0%)
+    crypto_cpu_us           661 → 361        (-45.4%)
+    crypto_ram_kb          0.17 → 0.2        (+17.6%)
+    hs_latency_ms           746 → 834        (+11.7%)
+    hs_req_bytes            178 → 26         (-85.4%)
+    hs_resp_bytes           153 → 1.54e+03   (+906.5%)
+
+CSVs escritos em: /mnt/c/viper5000/git/MSI-TESE/results/run-2026-07-21/metrics/extract

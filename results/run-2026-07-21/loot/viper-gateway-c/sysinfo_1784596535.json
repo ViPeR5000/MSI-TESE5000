@@ -1,0 +1,9 @@
+{
+  "os": "Linux 6.18.34+rpt-rpi-v8",
+  "distro": "Debian GNU/Linux 13 (trixie)",
+  "node": "viper-gateway-c",
+  "arch": "aarch64",
+  "ip": "192.168.30.100",
+  "user": "root",
+  "admin": "Yes"
+}
