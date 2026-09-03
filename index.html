@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MSI-TESE — Testbed Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    header h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #58a6ff;
+    }
+    header p {
+      margin-top: .4rem;
+      font-size: .85rem;
+      color: #7d8590;
+    }
+    header .badges {
+      display: flex;
+      justify-content: center;
+      gap: .5rem;
+      margin-top: .8rem;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .2rem .55rem;
+      border-radius: 99px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .badge-isa95  { background: #1f3a5f; color: #58a6ff; }
+    .badge-pqc    { background: #1a3a2a; color: #3fb950; }
+    .badge-lwc    { background: #3a2a1a; color: #d29922; }
+    .badge-ids    { background: #3a1a2a; color: #f47067; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .grid { grid-template-columns: 1fr; } }
+
+    .phase {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .phase.disabled {
+      opacity: .45;
+    }
+
+    .phase-header {
+      padding: .85rem 1rem .7rem;
+      border-bottom: 1px solid #30363d;
+    }
+    .phase-header .label {
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      margin-bottom: .25rem;
+    }
+    .phase-header h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .phase-header .vlan {
+      font-size: .7rem;
+      color: #7d8590;
+      margin-top: .15rem;
+    }
+    .phase-header .crypto {
+      font-size: .7rem;
+      margin-top: .35rem;
+      padding: .2rem .45rem;
+      border-radius: 4px;
+      display: inline-block;
+      font-weight: 600;
+    }
+
+    /* Phase colours */
+    .alpha .phase-header { border-left: 4px solid #d29922; }
+    .alpha .phase-header .label { color: #d29922; }
+    .alpha .phase-header .crypto { background: #2d2208; color: #d29922; }
+
+    .bravo .phase-header { border-left: 4px solid #3fb950; }
+    .bravo .phase-header .label { color: #3fb950; }
+    .bravo .phase-header .crypto { background: #0d2b14; color: #3fb950; }
+
+    .charlie .phase-header { border-left: 4px solid #58a6ff; }
+    .charlie .phase-header .label { color: #58a6ff; }
+    .charlie .phase-header .crypto { background: #0d1f3a; color: #58a6ff; }
+
+    .delta .phase-header { border-left: 4px solid #bc8cff; }
+    .delta .phase-header .label { color: #bc8cff; }
+    .delta .phase-header .crypto { background: #1a0d33; color: #bc8cff; }
+
+    .services {
+      padding: .6rem .75rem .8rem;
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+    }
+
+    .section-title {
+      font-size: .6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #7d8590;
+      margin: .5rem 0 .2rem;
+    }
+    .section-title:first-child { margin-top: .1rem; }
+
+    a.service-link {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .45rem .6rem;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #e6edf3;
+      font-size: .8rem;
+      transition: border-color .15s, background .15s;
+    }
+    a.service-link:hover {
+      border-color: #58a6ff;
+      background: #161b22;
+    }
+    a.service-link .icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+      width: 1.2rem;
+      text-align: center;
+    }
+    a.service-link .info { flex: 1; min-width: 0; }
+    a.service-link .name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    a.service-link .host {
+      font-size: .68rem;
+      color: #7d8590;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .service-link.disabled-link {
+      pointer-events: none;
+      opacity: .4;
+    }
+
+    .tbd-box {
+      padding: 1.5rem 1rem;
+      text-align: center;
+      color: #7d8590;
+      font-size: .78rem;
+    }
+    .tbd-box .tbd-icon { font-size: 1.8rem; margin-bottom: .4rem; }
+    .tbd-box .tbd-eta { font-size: .7rem; margin-top: .3rem; color: #484f58; }
+
+    footer {
+      text-align: center;
+      margin-top: 2.5rem;
+      font-size: .72rem;
+      color: #484f58;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MSI-TESE — ICS/IIoT Testbed</h1>
+  <p>Defense-in-Depth · Post-Quantum Cryptography · Lightweight Cryptography · IDS</p>
+  <div class="badges">
+    <span class="badge badge-isa95">ISA-95</span>
+    <span class="badge badge-pqc">Kyber768 + Dilithium3</span>
+    <span class="badge badge-lwc">ASCON-128 v1.2</span>
+    <span class="badge badge-ids">Suricata IDS</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ── ALPHA ── -->
+  <div class="phase alpha">
+    <div class="phase-header">
+      <div class="label">Phase Alpha</div>
+      <h2>Plaintext Baseline</h2>
+      <div class="vlan">VLAN 100 &nbsp;·&nbsp; 192.168.100.0/24</div>
+      <span class="crypto">Sem criptografia</span>
+    </div>
+    <div class="services">
+      <div class="section-title">Field (Layer 0)</div>
+      <a class="service-link" href="http://192.168.100.11/" target="_blank">
+        <span class="icon">🌡️</span>
+        <span class="info">
+          <span class="name">TempSensor Alpha</span>
+          <span class="host">192.168.100.11 · DHT22 · plaintext</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.12/" target="_blank">
+        <span class="icon">📡</span>
+        <span class="info">
+          <span class="name">KineticNode Alpha</span>
+          <span class="host">192.168.100.12 · ESP32-S3 · plaintext</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.13/" target="_blank">
+        <span class="icon">🔌</span>
+        <span class="info">
+          <span class="name">Relay Alpha</span>
+          <span class="host">192.168.100.13 · GPIO 18 · botões ON/OFF</span>
+        </span>
+      </a>
+
+      <div class="section-title">Edge (Layer 1/2)</div>
+      <a class="service-link" href="http://192.168.100.100:18083" target="_blank">
+        <span class="icon">📨</span>
+        <span class="info">
+          <span class="name">EMQX Dashboard</span>
+          <span class="host">192.168.100.100:18083 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.50:8080" target="_blank">
+        <span class="icon">🔧</span>
+        <span class="info">
+          <span class="name">OpenPLC Runtime</span>
+          <span class="host">192.168.100.50:8080 · openplc / openplc</span>
+        </span>
+      </a>
+
+      <div class="section-title">SCADA (Layer 2/3)</div>
+      <a class="service-link" href="http://192.168.100.60:3000" target="_blank">
+        <span class="icon">📊</span>
+        <span class="info">
+          <span class="name">Grafana</span>
+          <span class="host">192.168.100.60:3000 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:3000/d/msi-sensors/msi-tese-c2b7-sensor-data" target="_blank">
+        <span class="icon">📈</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Sensor Data</span>
+          <span class="host">/d/msi-sensors</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:3000/d/msi-telemetry/msi-tese-c2b7-system-telemetry" target="_blank">
+        <span class="icon">📉</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: System Telemetry</span>
+          <span class="host">/d/msi-telemetry</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:8086" target="_blank">
+        <span class="icon">🗄️</span>
+        <span class="info">
+          <span class="name">InfluxDB</span>
+          <span class="host">192.168.100.60:8086 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:1880" target="_blank">
+        <span class="icon">🔄</span>
+        <span class="info">
+          <span class="name">Node-RED</span>
+          <span class="host">192.168.100.60:1880</span>
+        </span>
+      </a>
+
+      <div class="section-title">Security</div>
+      <a class="service-link" href="http://192.168.100.250" target="_blank">
+        <span class="icon">🛡️</span>
+        <span class="info">
+          <span class="name">Suricata IDS (sensor)</span>
+          <span class="host">192.168.100.250 · eth0 · eve.json</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:3000/d/suricata-ids/msi-tese-c2b7-suricata-ids" target="_blank">
+        <span class="icon">🚨</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Suricata IDS</span>
+          <span class="host">/d/suricata-ids</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.100.60:3000/d/suricata-vlan/msi-tese-c2b7-suricata-by-vlan" target="_blank">
+        <span class="icon">🧭</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Suricata by VLAN (100/20/30)</span>
+          <span class="host">/d/suricata-vlan</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ── BRAVO ── -->
+  <div class="phase bravo">
+    <div class="phase-header">
+      <div class="label">Phase Bravo</div>
+      <h2>PQC + LWC Secured</h2>
+      <div class="vlan">VLAN 20 &nbsp;·&nbsp; 192.168.20.0/24</div>
+      <span class="crypto">Kyber768 + ASCON-128</span>
+    </div>
+    <div class="services">
+      <div class="section-title">Field (Layer 0)</div>
+      <a class="service-link" href="http://192.168.20.11/" target="_blank">
+        <span class="icon">🌡️</span>
+        <span class="info">
+          <span class="name">TempSensor Bravo</span>
+          <span class="host">192.168.20.11 · DHT22 · Kyber+ASCON</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.12/" target="_blank">
+        <span class="icon">📡</span>
+        <span class="info">
+          <span class="name">KineticNode Bravo</span>
+          <span class="host">192.168.20.12 · ESP32-S3 · Kyber+ASCON</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.13/" target="_blank">
+        <span class="icon">🔌</span>
+        <span class="info">
+          <span class="name">Relay Bravo</span>
+          <span class="host">192.168.20.13 · GPIO 18 · botões ON/OFF</span>
+        </span>
+      </a>
+
+      <div class="section-title">Edge (Layer 1/2)</div>
+      <a class="service-link" href="https://192.168.20.200:8000/dashboard" target="_blank">
+        <span class="icon">🔐</span>
+        <span class="info">
+          <span class="name">PQC Key Server</span>
+          <span class="host">https://192.168.20.200:8000/dashboard</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.100:18083" target="_blank">
+        <span class="icon">📨</span>
+        <span class="info">
+          <span class="name">EMQX Dashboard</span>
+          <span class="host">192.168.20.100:18083 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.50:8080" target="_blank">
+        <span class="icon">🔧</span>
+        <span class="info">
+          <span class="name">OpenPLC Runtime</span>
+          <span class="host">192.168.20.50:8080 · openplc / openplc</span>
+        </span>
+      </a>
+
+      <div class="section-title">SCADA (Layer 2/3)</div>
+      <a class="service-link" href="http://192.168.20.60:3000" target="_blank">
+        <span class="icon">📊</span>
+        <span class="info">
+          <span class="name">Grafana</span>
+          <span class="host">192.168.20.60:3000 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.60:3000/d/msi-sensors/msi-tese-c2b7-sensor-data" target="_blank">
+        <span class="icon">📈</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Sensor Data</span>
+          <span class="host">/d/msi-sensors</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.60:3000/d/msi-telemetry/msi-tese-c2b7-system-telemetry" target="_blank">
+        <span class="icon">📉</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: System Telemetry</span>
+          <span class="host">/d/msi-telemetry</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.60:8086" target="_blank">
+        <span class="icon">🗄️</span>
+        <span class="info">
+          <span class="name">InfluxDB</span>
+          <span class="host">192.168.20.60:8086 · admin / adminpassword123</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.60:1880" target="_blank">
+        <span class="icon">🔄</span>
+        <span class="info">
+          <span class="name">Node-RED</span>
+          <span class="host">192.168.20.60:1880</span>
+        </span>
+      </a>
+
+      <div class="section-title">Security</div>
+      <a class="service-link" href="http://192.168.20.250" target="_blank">
+        <span class="icon">🛡️</span>
+        <span class="info">
+          <span class="name">Suricata IDS (sensor)</span>
+          <span class="host">192.168.20.250 · eve.json</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.20.60:3000/d/suricata-ids/msi-tese-c2b7-suricata-ids" target="_blank">
+        <span class="icon">🚨</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Suricata IDS</span>
+          <span class="host">/d/suricata-ids</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ── CHARLIE ── -->
+  <div class="phase charlie">
+    <div class="phase-header">
+      <div class="label">Phase Charlie</div>
+      <h2>Classical Crypto Control</h2>
+      <div class="vlan">VLAN 30 &nbsp;·&nbsp; 192.168.30.0/24</div>
+      <span class="crypto">ECDH-P384 + ECDSA + AES-128-GCM</span>
+    </div>
+    <div class="services">
+      <div class="section-title">Field (Layer 0)</div>
+      <a class="service-link" href="http://192.168.30.11/" target="_blank">
+        <span class="icon">🌡️</span>
+        <span class="info">
+          <span class="name">TempSensor Charlie</span>
+          <span class="host">192.168.30.11 · DHT22 · ECDH+AES-GCM</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.12/" target="_blank">
+        <span class="icon">📡</span>
+        <span class="info">
+          <span class="name">KineticNode Charlie</span>
+          <span class="host">192.168.30.12 · ESP32-S3 · ECDH+AES-GCM</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.13/" target="_blank">
+        <span class="icon">🔌</span>
+        <span class="info">
+          <span class="name">Relay Charlie</span>
+          <span class="host">192.168.30.13 · GPIO 18 · botões ON/OFF</span>
+        </span>
+      </a>
+
+      <div class="section-title">Edge (Layer 1/2)</div>
+      <a class="service-link" href="https://192.168.30.200:8000/dashboard" target="_blank">
+        <span class="icon">🔐</span>
+        <span class="info">
+          <span class="name">Classical Key Server</span>
+          <span class="host">https://192.168.30.200:8000/dashboard</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.100:18083" target="_blank">
+        <span class="icon">📨</span>
+        <span class="info">
+          <span class="name">EMQX Dashboard</span>
+          <span class="host">192.168.30.100:18083</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.50:8080" target="_blank">
+        <span class="icon">🔧</span>
+        <span class="info">
+          <span class="name">OpenPLC Runtime</span>
+          <span class="host">192.168.30.50:8080 · openplc / openplc</span>
+        </span>
+      </a>
+
+      <div class="section-title">SCADA (Layer 2/3)</div>
+      <a class="service-link" href="http://192.168.30.60:3000" target="_blank">
+        <span class="icon">📊</span>
+        <span class="info">
+          <span class="name">Grafana</span>
+          <span class="host">192.168.30.60:3000</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.60:3000/d/msi-sensors/msi-tese-c2b7-sensor-data" target="_blank">
+        <span class="icon">📈</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: Sensor Data</span>
+          <span class="host">/d/msi-sensors</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.60:3000/d/msi-telemetry/msi-tese-c2b7-system-telemetry" target="_blank">
+        <span class="icon">📉</span>
+        <span class="info">
+          <span class="name">↳ Dashboard: System Telemetry</span>
+          <span class="host">/d/msi-telemetry</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.60:8086" target="_blank">
+        <span class="icon">🗄️</span>
+        <span class="info">
+          <span class="name">InfluxDB</span>
+          <span class="host">192.168.30.60:8086</span>
+        </span>
+      </a>
+      <a class="service-link" href="http://192.168.30.60:1880" target="_blank">
+        <span class="icon">🔀</span>
+        <span class="info">
+          <span class="name">Node-RED</span>
+          <span class="host">192.168.30.60:1880</span>
+        </span>
+      </a>
+
+      <div class="section-title">Security</div>
+      <a class="service-link" href="http://192.168.30.60:3000/d/suricata-ids" target="_blank">
+        <span class="icon">🛡️</span>
+        <span class="info">
+          <span class="name">Suricata IDS</span>
+          <span class="host">sensor 192.168.30.250 (eth0) · dashboard /d/suricata-ids</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ── DELTA ── -->
+  <div class="phase delta disabled">
+    <div class="phase-header">
+      <div class="label">Phase Delta</div>
+      <h2>Full Defense-in-Depth</h2>
+      <div class="vlan">VLAN 40 &nbsp;·&nbsp; 192.168.40.0/24</div>
+      <span class="crypto">PQC + LWC + IDS + Zero-Trust</span>
+    </div>
+    <div class="services">
+      <div class="tbd-box">
+        <div class="tbd-icon">🔒</div>
+        <div>Em desenvolvimento</div>
+        <div class="tbd-eta">Fase final — após Charlie</div>
+      </div>
+
+      <div class="section-title">Field (Layer 0)</div>
+      <a class="service-link disabled-link" href="#">
+        <span class="icon">📡</span>
+        <span class="info">
+          <span class="name">KineticNode Delta</span>
+          <span class="host">192.168.40.x · TBD</span>
+        </span>
+      </a>
+
+      <div class="section-title">Edge (Layer 1/2)</div>
+      <a class="service-link disabled-link" href="#">
+        <span class="icon">🔐</span>
+        <span class="info">
+          <span class="name">PQC Key Server</span>
+          <span class="host">192.168.40.200:8000 · TBD</span>
+        </span>
+      </a>
+      <a class="service-link disabled-link" href="#">
+        <span class="icon">📨</span>
+        <span class="info">
+          <span class="name">EMQX Dashboard</span>
+          <span class="host">192.168.40.100:18083 · TBD</span>
+        </span>
+      </a>
+
+      <div class="section-title">SCADA (Layer 2/3)</div>
+      <a class="service-link disabled-link" href="#">
+        <span class="icon">📊</span>
+        <span class="info">
+          <span class="name">Grafana</span>
+          <span class="host">192.168.40.60:3000 · TBD</span>
+        </span>
+      </a>
+
+      <div class="section-title">Security</div>
+      <a class="service-link disabled-link" href="#">
+        <span class="icon">🛡️</span>
+        <span class="info">
+          <span class="name">IDS + Zero-Trust Gateway</span>
+          <span class="host">192.168.40.x · TBD</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  MSI-TESE · Rui Melo · &nbsp;·&nbsp;
+  <a href="https://github.com/ViPeR5000/MSI-TESE" style="color:#58a6ff;text-decoration:none;">GitHub</a>
+</footer>
+
+</body>
+</html>
